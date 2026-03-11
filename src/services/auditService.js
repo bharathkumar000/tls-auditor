@@ -68,3 +68,28 @@ export const getAssetInventory = async (phone, email) => {
   
   return data || [];
 };
+/**
+ * Verifies if a domain is registered to the current operator.
+ */
+export const isDomainRegistered = async (url, user) => {
+  if (!user?.email && !user?.phone) return false;
+  
+  try {
+    // Check in audit_logs if there's an entry with a 'registration' flag or similar
+    // For now, we'll check if it's in a dedicated table or marked as primary
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .select('url')
+      .eq('url', url)
+      .or(`operator_phone.eq.${user.phone},operator_email.eq.${user.email}`)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (error) return false;
+    // For this implementation, we treat any domain previously audited by this user as 'Registered'
+    // in the context of showing the split screen and request button.
+    return data && data.length > 0;
+  } catch (e) {
+    return false;
+  }
+};
