@@ -14,10 +14,10 @@ function DomainsPage({ user, onReAudit }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (user?.phone) {
+    if (user?.phone || user?.email) {
       setLoading(true);
       setError(null);
-      getAssetInventory(user.phone)
+      getAssetInventory(user.phone, user.email)
         .then(data => {
           const unique = {};
           data.forEach(log => {
@@ -33,15 +33,15 @@ function DomainsPage({ user, onReAudit }) {
         })
         .finally(() => setLoading(false));
     }
-  }, [user?.phone]);
+  }, [user?.phone, user?.email]);
 
   return (
     <main className="main-content results-view">
       <header className="results-header" style={{ marginBottom: '2.5rem' }}>
-        <div className="dev-badge" style={{ marginBottom: '1rem' }}>NODE_OPERATOR // {user?.phone}</div>
-        <h1 className="title">REGISTERED_DOMAIN_INVENTORY</h1>
+        <div className="dev-badge" style={{ marginBottom: '1rem' }}>REGISTERED_ASSETS // {user?.phone || user?.email}</div>
+        <h1 className="title">MY_DOMAIN_INVENTORY</h1>
         <p className="subtitle" style={{ marginTop: '0.5rem' }}>
-          Managed Assets for Node Account: {user?.email}
+          Managed Infrastructure for Node: {user?.email || user?.phone}
         </p>
       </header>
 
