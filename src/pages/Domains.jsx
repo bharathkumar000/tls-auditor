@@ -14,12 +14,11 @@ function DomainsPage({ user, onReAudit }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (user?.email) {
+    if (user?.phone) {
       setLoading(true);
       setError(null);
-      getAssetInventory(user.email)
+      getAssetInventory(user.phone)
         .then(data => {
-          // Unique domains logic: Get most recent scan for each unique URL
           const unique = {};
           data.forEach(log => {
             if (!unique[log.url] || new Date(log.created_at) > new Date(unique[log.url].created_at)) {
@@ -34,7 +33,7 @@ function DomainsPage({ user, onReAudit }) {
         })
         .finally(() => setLoading(false));
     }
-  }, [user]);
+  }, [user?.phone]);
 
   return (
     <main className="main-content results-view">
