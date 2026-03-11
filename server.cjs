@@ -1,3 +1,6 @@
+require('dotenv').config();
+const express = require("express");
+const cors = require("cors");
 const tls = require("tls");
 const { createClient } = require('@supabase/supabase-js');
 
@@ -58,7 +61,8 @@ app.get("/", (req, res) => {
  */
 async function fetchCryptCheckData(host) {
   try {
-    const response = await fetch(`https://cryptcheck.fr/api/v1/host/${host}`);
+    const apiBase = process.env.CRYPT_CHECK_API || "https://cryptcheck.fr/api/v1/host/";
+    const response = await fetch(`${apiBase}${host}`);
     if (!response.ok) return null;
     const data = await response.json();
     return {
@@ -138,7 +142,8 @@ const protocolVulnerabilities = [
 
 // Certificate-level vulnerabilities
 const certVulnerabilities = [
-  { id: "SMALL_RSA", name: "Small RSA Key", severity: "MEDIUM", rationale: "RSA keys < 2048 bits can be brute-forced with modern hardware.", alt: "RSA 3072+ / ECC P-256" },
+  { id: "VERY_SMALL_RSA", name: "Critically Weak RSA Key", severity: "HIGH", rationale: "RSA keys < 1024 bits are dangerously weak and easily cracked.", alt: "RSA 3072+ / ECC P-256" },
+  { id: "SMALL_RSA", name: "Small RSA Key", severity: "MEDIUM", rationale: "RSA keys < 2048 bits are below modern industry standards.", alt: "RSA 3072+ / ECC P-256" },
   { id: "SHA1_CERT",  name: "SHA-1 Certificate", severity: "HIGH", rationale: "SHA-1 signature is collision-prone — certificates can be forged.", alt: "SHA-256 / SHA-384 signatures" },
 ];
 
@@ -344,9 +349,20 @@ app.post("/api/audit", async (req, res) => {
 
         // ── Certificate checks ──
         if (result.cert.bits > 0 && result.cert.bits < 2048) {
-          const v = certVulnerabilities.find(x => x.id === "SMALL_RSA");
+          const type = result.cert.bits < 1024 ? "VERY_SMALL_RSA" : "SMALL_RSA";
+          const severity = result.cert.bits < 1024 ? "RSA_PENALTY_20" : "RSA_PENALTY_10";
+          const v = certVulnerabilities.find(x => x.id === type);
+          
           foundIssues.push(`[${v.severity}] ${v.name} (${result.cert.bits} bits): ${v.rationale}`);
           recommendations.push(v.alt);
+          
+          matchedVulnerabilities.push({
+            id: v.id,
+            category: "CERTIFICATE",
+            severity: severity, // Custom severity for scoring loop
+            rationale: v.rationale,
+            secureFix: v.alt
+          });
         }
 
         if (result.cert.sigAlgorithm && result.cert.sigAlgorithm.toLowerCase().includes('sha1')) {
@@ -424,6 +440,8 @@ app.post("/api/audit", async (req, res) => {
         if (v.severity === 'CRITICAL') penalty += 25;
         if (v.severity === 'HIGH') penalty += 15;
         if (v.severity === 'MEDIUM') penalty += 8;
+        if (v.severity === 'RSA_PENALTY_20') penalty += 20;
+        if (v.severity === 'RSA_PENALTY_10') penalty += 10;
       });
       
       resultScore.score = Math.max(10, 100 - penalty);
