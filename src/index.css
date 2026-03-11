@@ -706,7 +706,7 @@ body {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 1.5rem;
-  padding: 3.5rem;
+  padding: 2.5rem 3.5rem;
   text-align: center;
   width: 100%;
   display: flex;
@@ -767,7 +767,7 @@ body {
 
 .vertical-divider {
   width: 1px;
-  height: 280px;
+  height: 250px;
   background: linear-gradient(to bottom, transparent, rgba(212, 175, 55, 0.2), transparent);
   box-shadow: 0 0 15px rgba(212, 175, 55, 0.05);
 }
