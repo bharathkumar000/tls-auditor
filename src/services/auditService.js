@@ -24,13 +24,23 @@ export const runAudit = async (url) => {
 export const saveAuditLog = async (url, user, auditData) => {
   if (!user?.email) return;
 
+  // Calculate Unified Score (Synchronized with Dashboard Report Logic)
+  const isPlaintext = auditData.scans.some(s => s.protocol === 'PLAINTEXT_HTTP');
+  const vulnerabilities = auditData.scans.flatMap(s => s.issues || []);
+  const safetyScoreLocal = auditData.overallStatus === 'SECURE' ? 95 : Math.max(10, 100 - (vulnerabilities.length * 20));
+  const extScore = auditData.externalSafety?.score ?? safetyScoreLocal;
+  
+  // High-Fidelity Scoring Enforcement: HTTP/Plaintext = Absolute Zero
+  let unifiedScore = Math.round((safetyScoreLocal * 0.4) + (extScore * 0.6));
+  if (isPlaintext || auditData.overallStatus === 'CRITICAL') unifiedScore = 0;
+
   const { error } = await supabase.from('audit_logs').insert([
     {
       url,
       operator_email: user.email,
       operator_phone: user.phone,
       status: auditData.overallStatus,
-      score: auditData.externalSafety?.score || 100,
+      score: unifiedScore,
       protocols: auditData.scans.map(s => s.protocol).join(', ')
     }
   ]);
