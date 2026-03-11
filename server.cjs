@@ -5,14 +5,47 @@ const tls = require("tls");
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 const path = require("path");
+const isProd = process.env.NODE_ENV === 'production';
 
 app.use(cors());
 app.use(express.json());
 
-const staticPath = path.join(__dirname, "dist");
-app.use(express.static(staticPath));
+// 🧪 INTEGRATED VITE ENGINE (THE MERGE)
+async function setupVite() {
+  if (!isProd) {
+    const { createServer: createViteServer } = require('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'custom'
+    });
+    app.use(vite.middlewares);
+    
+    // Serve index.html via Vite transform
+    app.get('*', async (req, res, next) => {
+      if (req.path.startsWith('/api')) return next();
+      try {
+        const fs = require('fs');
+        let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
+        template = await vite.transformIndexHtml(req.url, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e) {
+        vite.ssrFixStacktrace(e);
+        next(e);
+      }
+    });
+  } else {
+    const staticPath = path.join(__dirname, "dist");
+    app.use(express.static(staticPath));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api')) return next();
+      res.sendFile(path.join(staticPath, "index.html"));
+    });
+  }
+}
+
+setupVite();
 
 // ═══════════════════════════════════════════════════════════════════
 // SUPABASE CONFIGURATION (MASTER DATABASE)
