@@ -13,10 +13,10 @@ function HistoryPage({ user, onReAudit }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (user?.email) {
+    if (user?.phone) {
       setLoading(true);
       setError(null);
-      getAssetInventory(user.email)
+      getAssetInventory(user.phone)
         .then(data => setHistory(data))
         .catch(err => {
           console.error("Database Fetch Error:", err);
@@ -24,7 +24,7 @@ function HistoryPage({ user, onReAudit }) {
         })
         .finally(() => setLoading(false));
     }
-  }, [user]);
+  }, [user?.phone]);
 
   return (
     <main className="main-content results-view">
