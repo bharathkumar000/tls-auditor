@@ -17,20 +17,20 @@ export const verifyOtp = async (phone, token) => {
 /**
  * Legacy/Standard login support for phone and password.
  */
-export const login = async (phone, password) => {
-  return await supabase.auth.signInWithPassword({ phone, password });
+export const login = async (email, password) => {
+  return await supabase.auth.signInWithPassword({ email, password });
 };
 
 /**
  * Register a new node with full metadata (Email, Name).
  */
-export const signUp = async (phone, password, email, fullName) => {
+export const signUp = async (email, password, phone, fullName) => {
   return await supabase.auth.signUp({
-    phone,
+    email,
     password,
     options: {
       data: {
-        email: email,
+        phone: phone,
         full_name: fullName
       }
     }

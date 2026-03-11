@@ -44,13 +44,13 @@ export const saveAuditLog = async (url, user, auditData) => {
 /**
  * Retrieves the registered asset inventory for a specific operator.
  */
-export const getAssetInventory = async (email) => {
-  if (!email) return [];
+export const getAssetInventory = async (phone) => {
+  if (!phone) return [];
   
   const { data, error } = await supabase
     .from('audit_logs')
     .select('*')
-    .eq('operator_email', email)
+    .eq('operator_phone', phone)
     .order('created_at', { ascending: false });
 
   if (error) {
