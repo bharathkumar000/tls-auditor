@@ -735,8 +735,52 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 2rem;
+  gap: 1.5rem;
   width: 100%;
+}
+
+/* --- SPLIT REPORT LAYOUT --- */
+.report-split-container {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1rem 0;
+}
+
+.report-left-node {
+  flex: 1.2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.report-right-node {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.vertical-divider {
+  width: 1px;
+  height: 280px;
+  background: linear-gradient(to bottom, transparent, rgba(212, 175, 55, 0.2), transparent);
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.05);
+}
+
+@media (max-width: 900px) {
+  .report-split-container {
+    flex-direction: column;
+  }
+  .vertical-divider {
+    width: 60%;
+    height: 1px;
+    margin: 2rem 0;
+  }
 }
 
 .circular-chart {
@@ -1441,18 +1485,51 @@ body {
   gap: 1.25rem;
 }
 
-.switch-btn {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--text-gray);
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  font-size: 0.8rem;
-  transition: all 0.2s;
+/* --- AUTH MODE SELECTOR --- */
+.auth-mode-selector {
+  display: flex;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 0.75rem;
+  padding: 0.25rem;
+  margin-bottom: 2rem;
+  gap: 0.25rem;
 }
 
-.switch-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: white;
+.mode-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-gray);
+  padding: 0.6rem;
+  border-radius: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.05em;
+}
+
+.mode-btn:hover {
+  color: #fff;
+}
+
+.mode-btn.active {
+  background: rgba(212, 175, 55, 0.1);
+  color: var(--gold-primary);
+  box-shadow: inset 0 0 10px rgba(212, 175, 55, 0.05);
+  border: 1px solid rgba(212, 175, 55, 0.1);
+}
+
+.password-toggle:hover {
+  color: white !important;
+}
+
+.auth-form-container {
+  min-height: 120px;
 }
