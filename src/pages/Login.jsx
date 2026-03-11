@@ -24,6 +24,7 @@ function LoginPage({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [loginMode, setLoginMode] = useState('email'); // 'email' | 'phone'
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,20 +33,23 @@ function LoginPage({ onLoginSuccess }) {
     
     try {
       if (isLogin) {
-        // Dev Bypass or Stable Email Login
+        // Dev Bypass or Stable Login
         onLoginSuccess({ 
-          phone: phone === '1' ? '7975274945' : phone, 
-          email: email || 'anishkumar07@gmail.com', 
+          phone: loginMode === 'phone' ? (phone === '1' ? '7975274945' : phone) : '7975274945', 
+          email: loginMode === 'email' ? (email || 'anishkumar07@gmail.com') : 'anishkumar07@gmail.com', 
           fullName: 'Lead Operator ANISH' 
         });
       } else {
-        // Direct Account Initialization (Local Simulation + DB Link attempt)
-        // This ensures "Just create acc for now" works even if Twilio is broken
-        console.log("Initializing secure node for:", phone);
+        // Direct Account Initialization
+        console.log("Initializing secure node for:", loginMode === 'email' ? email : phone);
         setTimeout(() => {
           setLoading(false);
           alert('SYSTEM_NODE_INITIALIZED: Operator account created and linked to hardware ID.');
-          onLoginSuccess({ phone, email, fullName: fullName || 'System Operator' });
+          onLoginSuccess({ 
+            phone: phone || '7975274945', 
+            email: email || 'anishkumar07@gmail.com', 
+            fullName: fullName || 'System Operator' 
+          });
         }, 1200);
       }
     } catch (err) {
@@ -68,7 +72,7 @@ function LoginPage({ onLoginSuccess }) {
         transition={{ duration: 0.4 }}
         className="login-card"
       >
-        <div className="dev-badge">{isLogin ? 'v1.1.0 // TLS_SECURE' : 'NEW_NODES // REGISTER'}</div>
+        <div className="dev-badge">{isLogin ? 'v1.2.0 // MULTI_VECTOR' : 'NEW_NODES // REGISTER'}</div>
         
         <div className="logo-section">
           <motion.div 
@@ -83,6 +87,25 @@ function LoginPage({ onLoginSuccess }) {
           </p>
         </div>
 
+        {isLogin && (
+          <div className="auth-mode-selector">
+            <button 
+              type="button" 
+              className={`mode-btn ${loginMode === 'email' ? 'active' : ''}`}
+              onClick={() => setLoginMode('email')}
+            >
+              <Mail size={14} /> SECURE_EMAIL
+            </button>
+            <button 
+              type="button" 
+              className={`mode-btn ${loginMode === 'phone' ? 'active' : ''}`}
+              onClick={() => setLoginMode('phone')}
+            >
+              <Phone size={14} /> MOBILE_NODE
+            </button>
+          </div>
+        )}
+
         {error && (
           <div className="auth-error-banner">
             {error}
@@ -90,41 +113,46 @@ function LoginPage({ onLoginSuccess }) {
         )}
 
         <form onSubmit={handleSubmit} autoComplete="off">
+          <div className="auth-form-container">
+            {loginMode === 'email' || !isLogin ? (
+              <div className="form-group">
+                <label className="label">Operator Email (Login ID)</label>
+                <div className="input-wrapper">
+                  <Mail className="input-icon" size={18} />
+                  <input 
+                    name="operator_secure_id_vault"
+                    type="email" 
+                    className="input" 
+                    placeholder="anishkumar07@gmail.com" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="off"
+                    data-lpignore="true"
+                  />
+                </div>
+              </div>
+            ) : null}
 
-          <div className="form-group">
-            <label className="label">Operator Email (Login ID)</label>
-            <div className="input-wrapper">
-              <Mail className="input-icon" size={18} />
-              <input 
-                name="operator_secure_id_vault"
-                type="email" 
-                className="input" 
-                placeholder="anishkumar07@gmail.com" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="off"
-                data-lpignore="true"
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="label">Contact Number</label>
-            <div className="input-wrapper">
-              <Phone className="input-icon" size={18} />
-              <input 
-                name="operator_hardware_link"
-                type="tel" 
-                className="input" 
-                placeholder="7975274945"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-                autoComplete="off"
-                data-lpignore="true"
-              />
-            </div>
+            {loginMode === 'phone' || !isLogin ? (
+              <div className="form-group">
+                <label className="label">Contact Number</label>
+                <div className="input-wrapper">
+                  <Phone className="input-icon" size={18} />
+                  <input 
+                    name="operator_hardware_link"
+                    type="tel" 
+                    className="input" 
+                    placeholder="7975274945"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required
+                    autoComplete="off"
+                    data-lpignore="true"
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="form-group">
