@@ -117,7 +117,7 @@ function LoginPage({ onLoginSuccess }) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} autoComplete="off">
           {!isLogin && (
             <>
               <div className="form-group">
@@ -131,6 +131,7 @@ function LoginPage({ onLoginSuccess }) {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     required
+                    autoComplete="off"
                   />
                 </div>
               </div>
@@ -146,6 +147,7 @@ function LoginPage({ onLoginSuccess }) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    autoComplete="off"
                   />
                 </div>
               </div>
@@ -163,6 +165,7 @@ function LoginPage({ onLoginSuccess }) {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
+                autoComplete="off"
               />
             </div>
           </div>
@@ -178,6 +181,7 @@ function LoginPage({ onLoginSuccess }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 {...(!isLogin ? { required: true } : {})}
+                autoComplete="new-password"
               />
             </div>
           </div>
