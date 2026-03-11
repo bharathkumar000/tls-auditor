@@ -322,32 +322,6 @@ function DashboardPage({ user, onLogout }) {
                 </div>
               </div>
 
-              {/* ── Download Report Button ── */}
-              <button
-                onClick={generateReport}
-                style={{
-                  marginTop: '1.5rem',
-                  background: 'linear-gradient(135deg, #d4af37, #f0c040)',
-                  color: '#000',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  padding: '0.65rem 1.6rem',
-                  fontFamily: 'var(--font-mono)',
-                  fontWeight: '900',
-                  fontSize: '0.75rem',
-                  letterSpacing: '0.1rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  boxShadow: '0 0 20px rgba(212,175,55,0.3)',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 30px rgba(212,175,55,0.6)'}
-                onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 20px rgba(212,175,55,0.3)'}
-              >
-                ⬇ DOWNLOAD_REPORT.PDF
-              </button>
             </div>
           </div>
         </div>
@@ -393,6 +367,40 @@ function DashboardPage({ user, onLogout }) {
               </div>
             )}
           </div>
+        </div>
+
+        {/* ── Download Report Button (Relocated to bottom) ── */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '3.5rem', paddingBottom: '3rem' }}>
+          <button
+            onClick={generateReport}
+            style={{
+              background: 'linear-gradient(135deg, #d4af37, #f0c040)',
+              color: '#000',
+              border: 'none',
+              borderRadius: '0.6rem',
+              padding: '0.9rem 2.8rem',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: '900',
+              fontSize: '0.9rem',
+              letterSpacing: '0.15rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.8rem',
+              boxShadow: '0 10px 30px rgba(212,175,55,0.2)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.boxShadow = '0 15px 45px rgba(212,175,55,0.4)';
+              e.currentTarget.style.transform = 'translateY(-3px)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.boxShadow = '0 10px 30px rgba(212,175,55,0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            ⬇ DOWNLOAD_SECURITY_REPORT.PDF
+          </button>
         </div>
       </main>
     );

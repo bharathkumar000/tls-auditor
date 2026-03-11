@@ -12,41 +12,6 @@ const isProd = process.env.NODE_ENV === 'production';
 app.use(cors());
 app.use(express.json());
 
-// 🧪 INTEGRATED VITE ENGINE (THE MERGE)
-async function setupVite() {
-  if (!isProd) {
-    const { createServer: createViteServer } = require('vite');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'custom'
-    });
-    app.use(vite.middlewares);
-    
-    // Serve index.html via Vite transform
-    app.get('*', async (req, res, next) => {
-      if (req.path.startsWith('/api')) return next();
-      try {
-        const fs = require('fs');
-        let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
-        template = await vite.transformIndexHtml(req.url, template);
-        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
-      } catch (e) {
-        vite.ssrFixStacktrace(e);
-        next(e);
-      }
-    });
-  } else {
-    const staticPath = path.join(__dirname, "dist");
-    app.use(express.static(staticPath));
-    app.get('*', (req, res, next) => {
-      if (req.path.startsWith('/api')) return next();
-      res.sendFile(path.join(staticPath, "index.html"));
-    });
-  }
-}
-
-setupVite();
-
 // ═══════════════════════════════════════════════════════════════════
 // SUPABASE CONFIGURATION (MASTER DATABASE)
 // ═══════════════════════════════════════════════════════════════════
@@ -80,10 +45,6 @@ async function syncVulnerabilityDatabase() {
 
 // Initial sync on startup
 syncVulnerabilityDatabase();
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(staticPath, "index.html"));
-});
 
 // ═══════════════════════════════════════════════════════════════════
 // EXTERNAL API CONFIGURATION
@@ -492,27 +453,36 @@ app.post("/api/audit", async (req, res) => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════
-// API: /api/vulnerabilities — Return full bad cipher reference database
-// ═══════════════════════════════════════════════════════════════════
-
-app.get("/api/vulnerabilities", (req, res) => {
-  res.json({
-    total: badCipherSuites.length,
-    ciphers: badCipherSuites,
-    severityCounts: {
-      CRITICAL: badCipherSuites.filter(c => c.severity === "CRITICAL").length,
-      HIGH: badCipherSuites.filter(c => c.severity === "HIGH").length,
-      MEDIUM: badCipherSuites.filter(c => c.severity === "MEDIUM").length,
-    },
-    categories: [...new Set(badCipherSuites.map(c => c.category))]
-  });
-});
-
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api')) return next();
-  res.sendFile(path.join(__dirname, "dist", "index.html"));
-});
+// 🧪 INTEGRATED VITE ENGINE (THE MERGE CATCH-ALL)
+async function setupVite() {
+  if (!isProd) {
+    const { createServer: createViteServer } = require('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'custom'
+    });
+    app.use(vite.middlewares);
+    
+    app.get('*', async (req, res, next) => {
+      if (req.path.startsWith('/api')) return next();
+      try {
+        const fs = require('fs');
+        const template = await vite.transformIndexHtml(req.url, fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8'));
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e) {
+        vite.ssrFixStacktrace(e);
+        next(e);
+      }
+    });
+  } else {
+    const staticPath = path.join(__dirname, "dist");
+    app.use(express.static(staticPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(staticPath, "index.html"));
+    });
+  }
+}
+setupVite();
 
 app.listen(PORT, () => {
   console.log(`Auditor Engine running on http://localhost:${PORT}`);
