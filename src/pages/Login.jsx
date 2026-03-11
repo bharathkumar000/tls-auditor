@@ -39,16 +39,15 @@ function LoginPage({ onLoginSuccess }) {
     
     try {
       if (isLogin) {
-        // Try OTP Login if user wants? Or just standard? 
-        // For hackathon, let's provide standard but the user's snippet suggested sendOtp.
-        // We'll stick to Password login for now unless they provided NO password.
-        const { error, data } = await login(phone, password);
+        // Log in via Email (The more stable dev path)
+        const { error, data } = await login(email || 'admin@tls.dev', password);
         if (error) throw error;
         onLoginSuccess(data.user);
       } else {
-        const { error } = await signUp(phone, password, email, fullName);
+        // Register with Metadata (Name, Phone stored in profile)
+        const { error } = await signUp(email, password, phone, fullName);
         if (error) throw error;
-        alert('Registration successful! Please check your email for confirmation.');
+        alert('Operator Registration successful! Check email for confirmation.');
         setIsLogin(true);
       }
     } catch (err) {
@@ -118,43 +117,23 @@ function LoginPage({ onLoginSuccess }) {
         )}
 
         <form onSubmit={handleSubmit} autoComplete="off">
-          {!isLogin && (
-            <>
-              <div className="form-group">
-                <label className="label">Operator Name</label>
-                <div className="input-wrapper">
-                  <Cpu className="input-icon" size={18} />
-                  <input 
-                    name="node_operator_name"
-                    type="text" 
-                    className="input" 
-                    placeholder="System Admin / Lead Dev"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                    autoComplete="off"
-                  />
-                </div>
-              </div>
 
-              <div className="form-group">
-                <label className="label">Operator Email</label>
-                <div className="input-wrapper">
-                  <Mail className="input-icon" size={18} />
-                  <input 
-                    name="node_operator_email"
-                    type="email" 
-                    className="input" 
-                    placeholder="admin@tls-auditor.sys"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    autoComplete="no-autofill-email"
-                  />
-                </div>
-              </div>
-            </>
-          )}
+          <div className="form-group">
+            <label className="label">Operator Email (Login ID)</label>
+            <div className="input-wrapper">
+              <Mail className="input-icon" size={18} />
+              <input 
+                name="node_operator_email"
+                type="email" 
+                className="input" 
+                placeholder="admin@tls-auditor.sys"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </div>
+          </div>
 
           <div className="form-group">
             <label className="label">Contact Number</label>
@@ -168,7 +147,7 @@ function LoginPage({ onLoginSuccess }) {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
-                autoComplete="new-operator-contact"
+                autoComplete="tel"
               />
             </div>
           </div>
@@ -202,15 +181,22 @@ function LoginPage({ onLoginSuccess }) {
             )}
           </button>
           
-          {isLogin && (
-            <button 
-              type="button" 
-              className="otp-link-btn"
-              onClick={handleSendOtp}
-              style={{ width: '100%', marginTop: '0.5rem', background: 'transparent', color: 'var(--gold-primary)', border: 'none', fontSize: '0.8rem', cursor: 'pointer' }}
-            >
-              Alternative: Sign in with OTP Code
-            </button>
+          {!isLogin && (
+            <div className="form-group">
+              <label className="label">Verification Code (Optional/Skip)</label>
+              <div className="input-wrapper">
+                <Cpu className="input-icon" size={18} />
+                <input 
+                  name="node_operator_name"
+                  type="text" 
+                  className="input" 
+                  placeholder="System Identity Name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+            </div>
           )}
         </form>
 
