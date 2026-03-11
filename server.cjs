@@ -1,7 +1,5 @@
-require('dotenv').config();
-const express = require("express");
-const cors = require("cors");
 const tls = require("tls");
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = 3000;
@@ -12,6 +10,40 @@ app.use(express.json());
 
 const staticPath = path.join(__dirname, "dist");
 app.use(express.static(staticPath));
+
+// ═══════════════════════════════════════════════════════════════════
+// SUPABASE CONFIGURATION (MASTER DATABASE)
+// ═══════════════════════════════════════════════════════════════════
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://vnttxsfsnkqpytnfexuc.supabase.co';
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZudHR4c2ZzbmtxcHl0bmZleHVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMDE4MDUsImV4cCI6MjA4ODc3NzgwNX0.K8s8eR44dTkYLlgvGHW8N4KilGJ68mFDr7lWor4SoDk';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+let databaseInsecureCiphers = [];
+
+/**
+ * Syncs the local engine with the master insecure_ciphers table
+ */
+async function syncVulnerabilityDatabase() {
+  try {
+    const { data, error } = await supabase
+      .from('insecure_ciphers')
+      .select('*');
+    if (error) throw error;
+    databaseInsecureCiphers = data.map(c => ({
+      cipherName: c.cipher_suite_name,
+      category: c.issue_category,
+      severity: c.severity,
+      rationale: `Vulnerability detected in ${c.issue_category} category.`,
+      secureFix: c.recommended_fix
+    }));
+    console.log(`[DB_SYNC] Synchronized ${databaseInsecureCiphers.length} insecure ciphers from Supabase.`);
+  } catch (err) {
+    console.warn(`[DB_SYNC_FAIL] Using local fallback: ${err.message}`);
+  }
+}
+
+// Initial sync on startup
+syncVulnerabilityDatabase();
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(staticPath, "index.html"));
@@ -195,11 +227,12 @@ async function testProtocol(host, protocol) {
 function matchCipherVulnerabilities(cipherName) {
   const c = cipherName.toUpperCase();
   const matched = [];
+  
+  // Use database-sourced ciphers or fallback to consolidated list
+  const cipherSource = databaseInsecureCiphers.length > 0 ? databaseInsecureCiphers : badCipherSuites;
 
-  // 1. Check for exact matches against our bad cipher database
-  for (const bad of badCipherSuites) {
+  for (const bad of cipherSource) {
     const badUpper = bad.cipherName.toUpperCase();
-    // Convert IANA name to OpenSSL-ish pattern for matching
     const patterns = generateMatchPatterns(badUpper);
     
     for (const pattern of patterns) {
@@ -367,7 +400,7 @@ app.post("/api/audit", async (req, res) => {
     // Final Unified Score Resolution
     const resultScore = { provider, score: externalScore };
 
-    // 🔍 ENHANCED SECURITY LOGIC: If no TLS protocols are supported, it's a critical failure.
+    // 🔍 MISSION SCORING LOGIC: If no TLS protocols are supported, it's a critical failure.
     if (finalResults.scans.length === 0 || (finalResults.scans.length === 1 && finalResults.scans[0].protocol === 'NONE_DETECTED')) {
       finalResults.overallStatus = "VULNERABLE";
       resultScore.score = 0; 
@@ -384,9 +417,17 @@ app.post("/api/audit", async (req, res) => {
         });
       }
     } else if (resultScore.score === null) {
-      const vulnerabilities = finalResults.scans.flatMap(s => s.issues);
-      resultScore.score = Math.max(15, 100 - (vulnerabilities.length * 12));
-      resultScore.provider = 'SIMULATED';
+      // Internal scoring based on vulnerability severity weights
+      const vulnerabilities = finalResults.scans.flatMap(s => s.matchedVulnerabilities);
+      let penalty = 0;
+      vulnerabilities.forEach(v => {
+        if (v.severity === 'CRITICAL') penalty += 25;
+        if (v.severity === 'HIGH') penalty += 15;
+        if (v.severity === 'MEDIUM') penalty += 8;
+      });
+      
+      resultScore.score = Math.max(10, 100 - penalty);
+      resultScore.provider = 'INTERNAL_SCANNER';
     }
 
     finalResults.externalSafety = resultScore;
