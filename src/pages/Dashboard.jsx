@@ -103,6 +103,7 @@ function DashboardPage({ user, onLogout }) {
     
     const statusObj = getStatusInfo(safetyScore);
     const strokeDasharray = `${(safetyScore * 314) / 100}, 314`;
+    const strokeDasharrayExternal = `${(externalScore * 238) / 100}, 238`;
 
     return (
       <main className="main-content results-view">
@@ -160,30 +161,67 @@ function DashboardPage({ user, onLogout }) {
             <p className="percentage-label">Visual Threat Vector</p>
             <div className="chart-container" style={{ marginTop: '1rem' }}>
               <svg viewBox="0 0 110 110" className="circular-chart" style={{ width: '220px', height: '220px' }}>
+                {/* Unified Score - Outer Ring */}
                 <circle className="circle-bg" cx="55" cy="55" r="50"></circle>
-                <circle className="circle" cx="55" cy="55" r="50" style={{ strokeDasharray, stroke: statusObj.color }}></circle>
+                <circle className="circle" cx="55" cy="55" r="50" style={{ strokeDasharray, stroke: statusObj.color, strokeWidth: '3.8' }}></circle>
+                
+                {/* External Intel - Inner Ring */}
+                <circle className="circle-bg" cx="55" cy="55" r="38" style={{ strokeWidth: '2', opacity: '0.3' }}></circle>
+                <circle className="circle" cx="55" cy="55" r="38" style={{ strokeDasharray: strokeDasharrayExternal, stroke: '#51afef', strokeWidth: '3.5', opacity: '0.8' }}></circle>
               </svg>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', fontSize: '0.6rem', opacity: 0.7 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: statusObj.color }}></div> UNIFIED
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#51afef' }}></div> EXTERNAL
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Detailed Scans List */}
-        <div className="vulnerability-list" style={{ marginTop: '3rem' }}>
-          <h3 style={{ borderLeft: '3px solid var(--gold-primary)', paddingLeft: '1rem', marginBottom: '2rem' }}>TLS_PROTOCOL_STACK_ANALYSIS</h3>
-          {auditResults.scans.map((scan, i) => (
-            <div key={i} className="vuln-card">
-              <div className="vuln-header">
-                <div className={`severity-badge ${scan.status === 'SECURE' ? 'low' : 'high'}`}>{scan.status}</div>
-                <h4 className="vuln-title">{scan.protocol} :: {scan.cipher}</h4>
-              </div>
-              <p className="vuln-description">Extraction methodology: Active certificate handshake analysis.</p>
-              {scan.issues.length > 0 && (
-                <div className="vuln-tags">
-                  {scan.issues.map((iss, j) => <span key={j} className="tag">{iss}</span>)}
-                </div>
-              )}
+        {/* Detailed Scans List - Full Terminal Style */}
+        <div className="terminal-preview" style={{ marginTop: '3rem' }}>
+          <div className="terminal-header">
+            <div className="terminal-dots">
+              <span style={{ backgroundColor: '#ff5f56' }}></span>
+              <span style={{ backgroundColor: '#ffbd2e' }}></span>
+              <span style={{ backgroundColor: '#27c93f' }}></span>
             </div>
-          ))}
+            <div className="terminal-title">TLS_PROTOCOL_STACK_ANALYSIS // {auditResults.target}</div>
+          </div>
+          <div className="terminal-body">
+            {auditResults.scans.map((scan, i) => (
+              <div key={i} style={{ marginBottom: '0.75rem' }}>
+                <div className="terminal-line success">
+                  <span className="time">[{String(i + 1).padStart(2, '0')}]</span>
+                  <span className="msg" style={{ color: scan.status === 'SECURE' ? '#27c93f' : '#ffbd2e', fontWeight: 'bold' }}>
+                    {scan.protocol} :: {scan.cipher} — <span style={{ opacity: 0.8 }}>{scan.status}</span>
+                  </span>
+                </div>
+                <div className="terminal-line">
+                  <span className="time" style={{ opacity: 0 }}>[00]</span>
+                  <span className="msg" style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem' }}>
+                    Extraction methodology: Active certificate handshake analysis.
+                  </span>
+                </div>
+                {scan.issues.map((iss, j) => (
+                  <div key={j} className="terminal-line error">
+                    <span className="time" style={{ opacity: 0 }}>[00]</span>
+                    <span className="msg" style={{ color: iss.startsWith('[CRITICAL]') ? '#ff4b4b' : iss.startsWith('[HIGH]') ? '#ffbd2e' : '#e0ac57' }}>
+                      {iss}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ))}
+            {auditResults.scans.length === 0 && (
+              <div className="terminal-line error">
+                <span className="msg">No protocol entries detected.</span>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     );
