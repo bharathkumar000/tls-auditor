@@ -13,10 +13,10 @@ function HistoryPage({ user, onReAudit }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (user?.phone) {
+    if (user?.phone || user?.email) {
       setLoading(true);
       setError(null);
-      getAssetInventory(user.phone)
+      getAssetInventory(user.phone, user.email)
         .then(data => setHistory(data))
         .catch(err => {
           console.error("Database Fetch Error:", err);
@@ -24,15 +24,15 @@ function HistoryPage({ user, onReAudit }) {
         })
         .finally(() => setLoading(false));
     }
-  }, [user?.phone]);
+  }, [user?.phone, user?.email]);
 
   return (
     <main className="main-content results-view">
       <header className="results-header" style={{ marginBottom: '2.5rem' }}>
-        <div className="dev-badge" style={{ marginBottom: '1rem' }}>ASSET_OWNER // {user?.phone}</div>
-        <h1 className="title">REGISTERED_DOMAIN_INVENTORY</h1>
+        <div className="dev-badge" style={{ marginBottom: '1rem' }}>NODE_HISTORY // {user?.phone || user?.email}</div>
+        <h1 className="title">HIGH_FIDELITY_ACCESS_LOG </h1>
         <p className="subtitle" style={{ marginTop: '0.5rem' }}>
-          Managed Assets for Node Account: {user?.email}
+          Comprehensive Audit Trail for Operator: {user?.email || user?.phone}
         </p>
       </header>
 
@@ -66,12 +66,12 @@ function HistoryPage({ user, onReAudit }) {
             <table className="vuln-table shadow-2xl">
               <thead>
                 <tr>
-                  <th>Domain Asset</th>
+                  <th>Domain Endpoint</th>
                   <th>Security Status</th>
                   <th>Threat Index</th>
                   <th>Protocols</th>
-                  <th>Purchase Date</th>
-                  <th style={{ textAlign: 'right' }}>Asset Audit</th>
+                  <th>Audit Timestamp</th>
+                  <th style={{ textAlign: 'right' }}>Re-Analyze</th>
                 </tr>
               </thead>
               <tbody>
