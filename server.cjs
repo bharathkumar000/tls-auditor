@@ -5,7 +5,7 @@ const tls = require("tls");
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 9090;
 const path = require("path");
 const isProd = process.env.NODE_ENV === 'production';
 
