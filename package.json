@@ -1,7 +1,8 @@
 {
   "name": "tls-auditor",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "High-Fidelity Automated TLS/SSL Security Infrastructure Auditor",
   "type": "module",
   "scripts": {
     "dev": "nodemon server.cjs",

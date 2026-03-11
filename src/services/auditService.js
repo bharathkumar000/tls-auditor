@@ -12,7 +12,7 @@ export const runAudit = async (url) => {
   });
 
   if (!response.ok) {
-    throw new Error(`System Error: ${response.status} - Use Port 3000`);
+    throw new Error(`System Error: ${response.status} - Use Port 9090`);
   }
 
   return await response.json();
@@ -42,19 +42,27 @@ export const saveAuditLog = async (url, user, auditData) => {
 };
 
 /**
- * Retrieves the registered asset inventory for a specific operator.
+ * Retrieves the comprehensive asset history and registered domains for an operator.
+ * Searches across both phone and email vectors to ensure zero data loss.
  */
-export const getAssetInventory = async (phone) => {
-  if (!phone) return [];
+export const getAssetInventory = async (phone, email) => {
+  if (!phone && !email) return [];
   
-  const { data, error } = await supabase
-    .from('audit_logs')
-    .select('*')
-    .eq('operator_phone', phone)
-    .order('created_at', { ascending: false });
+  let query = supabase.from('audit_logs').select('*');
+  
+  // High-Fidelity Multi-Vector Search
+  if (phone && email) {
+    query = query.or(`operator_phone.eq.${phone},operator_email.eq.${email}`);
+  } else if (phone) {
+    query = query.eq('operator_phone', phone);
+  } else {
+    query = query.eq('operator_email', email);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Failed to fetch assets:', error);
+    console.error('DATABASE_FETCH_ERROR:', error);
     throw error;
   }
   
