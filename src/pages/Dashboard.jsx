@@ -85,9 +85,22 @@ function DashboardPage({ user, onLogout }) {
   if (showResults && auditResults) {
     const vulnerabilities = auditResults.scans.flatMap(s => s.issues);
     const matchedVulns = auditResults.scans.flatMap(s => s.matchedVulnerabilities || []);
-    const safetyScoreLocal = auditResults.overallStatus === 'SECURE' ? 98 : Math.max(20, 100 - (vulnerabilities.length * 15));
-    const externalScore = auditResults.externalSafety?.score || safetyScoreLocal;
-    const safetyScore = Math.round((safetyScoreLocal * 0.4) + (externalScore * 0.6));
+    
+    // 🧠 INTELLIGENT SCORING: No protocols = 0% safety.
+    let safetyScore;
+    let safetyScoreLocal;
+    let externalScore = auditResults.externalSafety?.score ?? 0;
+
+    if (auditResults.scans.length === 1 && auditResults.scans[0].protocol === 'NONE_DETECTED') {
+      safetyScoreLocal = 0;
+      safetyScore = 0;
+      externalScore = 0;
+    } else {
+      safetyScoreLocal = auditResults.overallStatus === 'SECURE' ? 95 : Math.max(10, 100 - (vulnerabilities.length * 20));
+      const finalExternal = auditResults.externalSafety?.score ?? safetyScoreLocal;
+      safetyScore = Math.round((safetyScoreLocal * 0.4) + (finalExternal * 0.6));
+    }
+    
     const statusObj = getStatusInfo(safetyScore);
     const strokeDasharray = `${(safetyScore * 314) / 100}, 314`;
 
@@ -120,13 +133,37 @@ function DashboardPage({ user, onLogout }) {
             <div style={{ marginTop: '1.5rem', background: `${statusObj.color}15`, padding: '0.4rem 1rem', borderRadius: '2rem', display: 'inline-block', fontWeight: 'bold', color: statusObj.color }}>
               STATUS: {statusObj.text}
             </div>
+
+            <div style={{ marginTop: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+              <span style={{ fontSize: '0.6rem', color: 'var(--text-gray)', letterSpacing: '0.15em', fontWeight: '800' }}>INTELLIGENCE_SOURCE:</span>
+              <span style={{ 
+                background: auditResults.externalSafety.provider !== 'SIMULATED' ? 'var(--gold-primary)20' : 'rgba(255,255,255,0.05)', 
+                color: auditResults.externalSafety.provider !== 'SIMULATED' ? 'var(--gold-primary)' : 'var(--text-gray)',
+                padding: '0.2rem 0.6rem',
+                borderRadius: '0.25rem',
+                fontSize: '0.7rem',
+                fontWeight: '900',
+                fontFamily: 'var(--font-mono)',
+                border: `1px solid ${auditResults.externalSafety.provider !== 'SIMULATED' ? 'var(--gold-primary)40' : 'rgba(255,255,255,0.1)'}`
+              }}>
+                {auditResults.externalSafety.provider}
+              </span>
+            </div>
+            {auditResults.cryptCheck?.grade && auditResults.externalSafety.provider === 'CRYPTCHECK' && (
+              <div style={{ marginTop: '0.5rem', fontSize: '0.65rem', color: 'var(--text-gray)', opacity: 0.6 }}>
+                ASSESSMENT_GRADE: <span style={{ color: 'white' }}>{auditResults.cryptCheck.grade}</span>
+              </div>
+            )}
           </div>
 
-          <div className="chart-container">
-            <svg viewBox="0 0 110 110" className="circular-chart" style={{ width: '220px', height: '220px' }}>
-              <circle className="circle-bg" cx="55" cy="55" r="50"></circle>
-              <circle className="circle" cx="55" cy="55" r="50" style={{ strokeDasharray, stroke: statusObj.color }}></circle>
-            </svg>
+          <div className="safety-score-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <p className="percentage-label">Visual Threat Vector</p>
+            <div className="chart-container" style={{ marginTop: '1rem' }}>
+              <svg viewBox="0 0 110 110" className="circular-chart" style={{ width: '220px', height: '220px' }}>
+                <circle className="circle-bg" cx="55" cy="55" r="50"></circle>
+                <circle className="circle" cx="55" cy="55" r="50" style={{ strokeDasharray, stroke: statusObj.color }}></circle>
+              </svg>
+            </div>
           </div>
         </div>
 
@@ -137,7 +174,7 @@ function DashboardPage({ user, onLogout }) {
             <div key={i} className="vuln-card">
               <div className="vuln-header">
                 <div className={`severity-badge ${scan.status === 'SECURE' ? 'low' : 'high'}`}>{scan.status}</div>
-                <h4 className="vuln-title">{scan.protocol} :: {scan.ciphersFound} Ciphers</h4>
+                <h4 className="vuln-title">{scan.protocol} :: {scan.cipher}</h4>
               </div>
               <p className="vuln-description">Extraction methodology: Active certificate handshake analysis.</p>
               {scan.issues.length > 0 && (
@@ -162,40 +199,7 @@ function DashboardPage({ user, onLogout }) {
         <div className="dev-badge">OPERATOR_ACCESS_NODE // {user?.phone}</div>
       </header>
 
-      <div className="upload-container">
-        <form onSubmit={handleAudit} style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '1.25rem' }}>
-          <div style={{ position: 'relative', width: '100%' }}>
-            <Search className="search-icon" size={20} />
-            <input 
-              type="text" 
-              placeholder="SYSTEM_ENDPOINT_URL (e.g., google.com)" 
-              className="dash-input"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              style={{ width: '100%' }}
-            />
-          </div>
-          <button className="run-btn" disabled={isAuditing} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', width: 'fit-content', padding: '0.8rem 2rem' }}>
-            {isAuditing ? <Loader2 className="animate-spin" size={18} /> : <><Shield size={18} /> RUN_AUDIT</>}
-          </button>
-        </form>
-
-        <AnimatePresence>
-          {showReportButton && (
-            <motion.button 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="view-report-btn"
-              onClick={() => setShowResults(true)}
-              style={{ position: 'absolute', bottom: '-4rem', left: '0' }}
-            >
-              <ExternalLink size={18} /> OPEN_MISSION_REPORT
-            </motion.button>
-          )}
-        </AnimatePresence>
-      </div>
-
-      <div className="stats-grid">
+      <div className="stats-grid" style={{ marginBottom: '2.5rem' }}>
         <div className="stat-card">
           <div className="stat-header">
             <Shield size={14} /> ACCESS_NODE
@@ -210,6 +214,37 @@ function DashboardPage({ user, onLogout }) {
           <div className="stat-value">READY_TO_AUDIT</div>
           <div className="stat-footer">CORE_LOGIC_ONLINE</div>
         </div>
+      </div>
+
+      <div className="upload-container">
+        <form onSubmit={handleAudit} style={{ width: '100%' }}>
+          <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+            <Search className="search-icon" size={20} />
+            <input 
+              type="text" 
+              placeholder="SYSTEM_ENDPOINT_URL (e.g., google.com)" 
+              className="dash-input"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              style={{ width: '100%', paddingRight: '10rem' }}
+            />
+            <button 
+              className="run-btn" 
+              disabled={isAuditing} 
+              style={{ 
+                position: 'absolute', 
+                right: '0.5rem', 
+                padding: '0.6rem 1.5rem',
+                fontSize: '0.8rem',
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem' 
+              }}
+            >
+              {isAuditing ? <Loader2 className="animate-spin" size={16} /> : <><Shield size={16} /> RUN_AUDIT</>}
+            </button>
+          </div>
+        </form>
       </div>
 
       <div className="terminal-preview">
@@ -233,6 +268,23 @@ function DashboardPage({ user, onLogout }) {
           )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {showReportButton && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{ marginTop: '2.5rem', display: 'flex', justifyContent: 'center', paddingBottom: '2rem' }}
+          >
+            <button 
+              className="view-report-btn"
+              onClick={() => setShowResults(true)}
+            >
+              <ExternalLink size={18} /> OPEN_MISSION_REPORT
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
