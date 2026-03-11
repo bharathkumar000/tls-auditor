@@ -11,9 +11,12 @@ import {
   ChevronRight,
   Terminal,
   X,
-  ExternalLink
+  ExternalLink,
+  Edit3,
+  Download,
+  AlertTriangle
 } from 'lucide-react';
-import { runAudit, saveAuditLog } from '../services/auditService';
+import { runAudit, saveAuditLog, isDomainRegistered } from '../services/auditService';
 
 function DashboardPage({ user, onLogout }) {
   const [url, setUrl] = useState('');
@@ -30,6 +33,7 @@ function DashboardPage({ user, onLogout }) {
     { time: new Date().toLocaleTimeString(), type: 'success', msg: 'Hot-Swap applied: Perfectly centered architecture enabled.' }
   ]);
   const [showReportButton, setShowReportButton] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
 
   useEffect(() => {
     sessionStorage.setItem('tls_audit_url', url);
@@ -61,6 +65,15 @@ function DashboardPage({ user, onLogout }) {
       addLog('Analyzing cryptographic integrity...', 'success');
       
       setAuditResults(results);
+      
+      // Authorized Node Verification
+      const registered = await isDomainRegistered(url, user);
+      setIsRegistered(registered);
+      
+      if (registered) {
+        addLog('AUTHORIZED_NODE_DETECTED: Enabling administrative command suite.', 'success');
+      }
+
       addLog('Audit complete. Secure record generated.', 'success');
       setShowReportButton(true);
 
@@ -204,7 +217,7 @@ function DashboardPage({ user, onLogout }) {
       doc.setFontSize(8.5);
       const protoColor = scan.status === 'SECURE' ? [39,201,63] : [212,175,55];
       doc.setTextColor(protoColor[0], protoColor[1], protoColor[2]);
-      doc.text(`[${String(i+1).padStart(2,'0')}] ${scan.protocol} :: ${scan.cipher}`, 22, y + 8);
+      doc.text(`[${String(i+1).padStart(2,'0')}] ${scan.protocol} :: ${scan.cipher} [${scan.cipherBits}-BIT]`, 22, y + 8);
 
       doc.setFont('courier', 'normal');
       doc.setFontSize(6.5);
@@ -286,9 +299,9 @@ function DashboardPage({ user, onLogout }) {
               {/* ── LEFT NODE: METRICS ── */}
               <div className="report-right-node"> {/* Using right-node class for styling but placing on left */}
                 <p className="percentage-label">Unified Threat Index</p>
-                <h2 className="percentage-value" style={{ color: statusObj.color, fontSize: '6rem' }}>{safetyScore}%</h2>
+                <h2 className="percentage-value" style={{ color: statusObj.color, fontSize: '5.5rem' }}>{safetyScore}%</h2>
                 
-                <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'center', gap: '2rem' }}>
+                <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'center', gap: '2rem' }}>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ color: 'var(--text-gray)', fontSize: '0.65rem', marginBottom: '0.2rem', letterSpacing: '0.1em' }}>INTERNAL</div>
                     <div style={{ color: 'var(--gold-primary)', fontWeight: '900', fontSize: '1.1rem' }}>{safetyScoreLocal}%</div>
@@ -300,7 +313,7 @@ function DashboardPage({ user, onLogout }) {
                   </div>
                 </div>
 
-                <div style={{ marginTop: '2rem', background: `${statusObj.color}20`, padding: '0.5rem 1.5rem', borderRadius: '2rem', display: 'inline-block', fontWeight: '900', color: statusObj.color, border: `1px solid ${statusObj.color}40`, letterSpacing: '0.1em', fontSize: '0.9rem' }}>
+                <div style={{ marginTop: '1.75rem', background: `${statusObj.color}20`, padding: '0.4rem 1.25rem', borderRadius: '2rem', display: 'inline-block', fontWeight: '900', color: statusObj.color, border: `1px solid ${statusObj.color}40`, letterSpacing: '0.1em', fontSize: '0.85rem' }}>
                   STATUS: {statusObj.text}
                 </div>
               </div>
@@ -312,7 +325,7 @@ function DashboardPage({ user, onLogout }) {
               <div className="report-left-node"> {/* Using left-node class for styling but placing on right */}
                 <p className="percentage-label">Visual Threat Vector</p>
                 <div className="chart-container">
-                  <svg viewBox="0 0 110 110" className="circular-chart" style={{ width: '280px', height: '280px' }}>
+                  <svg viewBox="0 0 110 110" className="circular-chart" style={{ width: '250px', height: '250px' }}>
                     <circle className="circle-bg" cx="55" cy="55" r="50"></circle>
                     <circle className="circle" cx="55" cy="55" r="50" style={{ strokeDasharray, stroke: statusObj.color, strokeWidth: '4' }}></circle>
                     <circle className="circle-bg" cx="55" cy="55" r="38" style={{ strokeWidth: '2', opacity: '0.3' }}></circle>
@@ -349,34 +362,81 @@ function DashboardPage({ user, onLogout }) {
           </div>
         </div>
 
+        {/* ── MISSION INTELLIGENCE TERMINAL ── */}
         <div className="terminal-preview" style={{ marginTop: '3rem' }}>
-          <div className="terminal-header">
-            <div className="terminal-dots"><span></span><span></span><span></span></div>
-            <div className="terminal-title">TLS_PROTOCOL_STACK_ANALYSIS // {auditResults.target}</div>
+          <div className="terminal-header" style={{ display: isRegistered ? 'grid' : 'block', gridTemplateColumns: isRegistered ? '1fr 1fr' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div className="terminal-dots"><span></span><span></span><span></span></div>
+              <div className="terminal-title">TLS_PROTOCOL_STACK_ANALYSIS // {auditResults.target}</div>
+            </div>
+            {isRegistered && (
+              <div style={{ paddingLeft: '1.5rem', borderLeft: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center' }}>
+                <div className="terminal-title" style={{ color: 'var(--gold-primary)' }}>CRYPTOGRAPHIC_SOLUTIONS_ENGINE // REMEDIATION</div>
+              </div>
+            )}
           </div>
-          <div className="terminal-body">
-            {auditResults.scans.map((scan, i) => (
-              <div key={i} style={{ marginBottom: '0.25rem' }}>
-                <div className="terminal-line success">
-                  <span className="time">[{String(i+1).padStart(2,'0')}]</span>
-                  <span className="msg" style={{ color: scan.status === 'SECURE' ? '#27c93f' : '#ffbd2e', fontWeight: 'bold' }}>
-                    {scan.protocol} :: {scan.cipher} — <span style={{ opacity: 0.8 }}>{scan.status}</span>
-                  </span>
+          
+          <div className="terminal-body" style={{ 
+            display: isRegistered ? 'grid' : 'block', 
+            gridTemplateColumns: isRegistered ? '1fr 1fr' : 'none',
+            gap: isRegistered ? '1px' : '0',
+            background: isRegistered ? 'rgba(255,255,255,0.05)' : 'transparent'
+          }}>
+            {/* LEFT PANE: LOGS & SCAN DATA */}
+            <div style={{ background: isRegistered ? 'rgba(0,0,0,0.2)' : 'transparent', padding: isRegistered ? '1.5rem' : '0' }}>
+              {auditResults.scans.map((scan, i) => (
+                <div key={i} style={{ marginBottom: '1.5rem' }}>
+                  <div className="terminal-line success">
+                    <span className="time">[{scan.protocol}]</span>
+                    <span className="msg" style={{ color: 'var(--gold-primary)', fontWeight: 'bold' }}>
+                      :: {scan.cipher} <span style={{ opacity: 0.6, fontSize: '0.7rem' }}>[{scan.cipherBits || 'N/A'}-BIT]</span>
+                    </span>
+                  </div>
+                  {scan.issues.map((iss, j) => (
+                    <div key={j} className="terminal-line error" style={{ marginLeft: '1rem' }}>
+                      <span className="msg" style={{ fontSize: '0.8rem' }}>{iss}</span>
+                    </div>
+                  ))}
                 </div>
-                {scan.issues.map((iss, j) => (
-                  <div key={j} className="terminal-line error">
-                    <span className="time" style={{ opacity: 0 }}>[00]</span>
-                    <span className="msg">{iss}</span>
+              ))}
+            </div>
+
+            {/* RIGHT PANE: SOLUTIONS (ONLY FOR REGISTERED) */}
+            {isRegistered && (
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1.5rem', borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
+                {auditResults.scans.map((scan, i) => (
+                  <div key={i} style={{ marginBottom: '1.5rem' }}>
+                    <div className="terminal-line info">
+                      <span className="time" style={{ color: 'var(--gold-primary)' }}>[REMEDY_{i+1}]</span>
+                      <span className="msg" style={{ fontWeight: '800', fontSize: '0.8rem' }}>{scan.protocol} SECURITY_FIX</span>
+                    </div>
+                    {scan.recommendations.map((rec, j) => (
+                      <div key={j} className="terminal-line success" style={{ marginLeft: '1rem', opacity: 0.8 }}>
+                        <ChevronRight size={12} style={{ display: 'inline', marginRight: '5px' }} />
+                        <span className="msg" style={{ fontSize: '0.75rem' }}>{rec}</span>
+                      </div>
+                    ))}
+                    {scan.recommendations.length === 0 && (
+                      <div className="terminal-line success" style={{ marginLeft: '1rem', color: '#4ade80' }}>
+                        <span className="msg" style={{ fontSize: '0.75rem' }}>Node compliant. No changes required for this stack.</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
-            ))}
+            )}
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '4rem', paddingBottom: '4rem' }}>
-          <button className="download-btn-primary" onClick={generateReport}>
-            ⬇ DOWNLOAD_REPORT.PDF
+        {/* ── MISSION COMMAND ACTIONS ── */}
+        <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center', marginTop: '3rem', paddingBottom: '4rem' }}>
+          {isRegistered && (
+            <button className="run-btn secondary" style={{ background: 'rgba(212, 175, 55, 0.1)', color: 'var(--gold-primary)', borderColor: 'var(--gold-primary)40', padding: '1rem 3rem' }}>
+              <Edit3 size={18} style={{ marginRight: '8px' }} /> REQUEST_CHANGES.MOD
+            </button>
+          )}
+          <button className="run-btn" onClick={generateReport} style={{ gap: '0.8rem', padding: '1rem 3rem' }}>
+            <Download size={20} /> DOWNLOAD_REPORT.PDF
           </button>
         </div>
       </main>

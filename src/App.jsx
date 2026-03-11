@@ -3,8 +3,7 @@ import { supabase } from './supabaseClient';
 import { logout } from './services/authService';
 import LoginPage from './pages/Login';
 import DashboardPage from './pages/Dashboard';
-import HistoryPage from './pages/History';
-import DomainsPage from './pages/Domains';
+import RecordsPage from './pages/Records';
 import TopNav from './components/TopNav';
 
 function App() {
@@ -92,13 +91,8 @@ function App() {
 
       {activeView === 'dashboard' ? (
         <DashboardPage user={user} onLogout={handleLogout} />
-      ) : activeView === 'domains' ? (
-        <DomainsPage user={user} onReAudit={(target) => {
-          setActiveView('dashboard');
-          if (target) sessionStorage.setItem('tls_audit_url', target);
-        }} />
       ) : (
-        <HistoryPage user={user} onReAudit={(target) => {
+        <RecordsPage user={user} onReAudit={(target) => {
           setActiveView('dashboard');
           if (target) sessionStorage.setItem('tls_audit_url', target);
         }} />
