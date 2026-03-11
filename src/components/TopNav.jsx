@@ -2,8 +2,7 @@ import React from 'react';
 import { 
   Zap, 
   LayoutDashboard, 
-  Globe,
-  History as HistoryIcon,
+  Shield,
   LogOut
 } from 'lucide-react';
 import LogoutButton from './LogoutButton';
@@ -24,16 +23,10 @@ function TopNav({ activeView, onViewChange, onLogout }) {
           <LayoutDashboard size={20} /> <span>DASHBOARD</span>
         </button>
         <button 
-          className={`nav-btn ${activeView === 'domains' ? 'active' : ''}`}
-          onClick={() => onViewChange('domains')}
+          className={`nav-btn ${activeView === 'records' ? 'active' : ''}`}
+          onClick={() => onViewChange('records')}
         >
-          <Globe size={20} /> <span>MY_DOMAINS</span>
-        </button>
-        <button 
-          className={`nav-btn ${activeView === 'history' ? 'active' : ''}`}
-          onClick={() => onViewChange('history')}
-        >
-          <HistoryIcon size={20} /> <span>HISTORY</span>
+          <Shield size={20} /> <span>RECORDS_VAULT</span>
         </button>
       </div>
 
