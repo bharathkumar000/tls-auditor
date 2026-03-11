@@ -20,39 +20,23 @@ app.get("/", (req, res) => {
 // ═══════════════════════════════════════════════════════════════════
 // EXTERNAL API CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════
-const APIVOID_KEY = process.env.APIVOID_KEY;
 
 /**
- * Fetches safety rating from external provider (APIVoid)
- * Fallback to local simulation if no key or API fails
+ * Fetches third-party audit data from CryptCheck (No key needed)
  */
-async function fetchExternalSafetyRating(host) {
-  if (!APIVOID_KEY || APIVOID_KEY === 'your_apivoid_key_here') {
-    return { provider: 'SIMULATED', score: null }; // Will be calculated after audit
-  }
-
+async function fetchCryptCheckData(host) {
   try {
-    const response = await fetch('https://api.apivoid.com/v2/tls-check', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-API-Key': APIVOID_KEY
-      },
-      body: JSON.stringify({ host })
-    });
-
-    if (!response.ok) throw new Error(`APIVoid error: ${response.status}`);
-    
+    const response = await fetch(`https://cryptcheck.fr/api/v1/host/${host}`);
+    if (!response.ok) return null;
     const data = await response.json();
-    // APIVoid usually returns a security_score or similar
-    return { 
-      provider: 'APIVOID', 
-      score: data?.data?.report?.security_score || 85,
-      details: data?.data?.report 
+    return {
+      grade: data.grade || '?',
+      hostname: data.hostname,
+      ciphersFound: data.details?.ciphers?.list?.length || 0,
+      raw: data
     };
   } catch (err) {
-    console.error('External API Fail:', err.message);
-    return { provider: 'SIMULATED', score: null };
+    return null;
   }
 }
 
@@ -150,25 +134,6 @@ function getSuggestion(cipherName) {
   return "SECURE: No immediate risks found in this cipher suite.";
 }
 
-/**
- * Fetches third-party audit data from CryptCheck (No key needed)
- */
-async function fetchCryptCheckData(host) {
-  try {
-    const response = await fetch(`https://cryptcheck.fr/api/v1/host/${host}`);
-    if (!response.ok) return null;
-    const data = await response.json();
-    return {
-      grade: data.grade || '?',
-      hostname: data.hostname,
-      ciphersFound: data.details?.ciphers?.list?.length || 0,
-      raw: data
-    };
-  } catch (err) {
-    return null;
-  }
-}
-
 // ═══════════════════════════════════════════════════════════════════
 // TLS PROTOCOL TESTING
 // ═══════════════════════════════════════════════════════════════════
@@ -201,7 +166,9 @@ async function testProtocol(host, protocol) {
         resolve({
           protocol: usedProtocol,
           cipher: cipher?.name || 'Unknown',
-          cert: safeCert
+          cert: safeCert,
+          authorized: socket.authorized,
+          authError: socket.authorizationError
         });
         socket.end();
       });
@@ -299,8 +266,7 @@ app.post("/api/audit", async (req, res) => {
   try {
     const testableProtocols = ["TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"];
     
-    // Start external safety rating check & CryptCheck in parallel
-    const externalSafetyPromise = fetchExternalSafetyRating(host);
+    // Start CryptCheck analysis in parallel for maximum mission efficiency
     const cryptCheckPromise = fetchCryptCheckData(host);
 
     const finalResults = {
@@ -356,11 +322,28 @@ app.post("/api/audit", async (req, res) => {
           recommendations.push(v.alt);
         }
 
+        // ── Certificate validity / authorization checks ──
+        const isExpired = result.cert.validTo && new Date(result.cert.validTo) < new Date();
+        
+        if (!result.authorized || isExpired) {
+          finalResults.overallStatus = "VULNERABLE";
+          if (isExpired) {
+            foundIssues.push(`[CRITICAL] Certificate Expired: Validity ended on ${result.cert.validTo}`);
+            recommendations.push("Renew the SSL/TLS certificate immediately.");
+          }
+          if (!result.authorized && !isExpired) {
+            const errorMsg = result.authError || "Untrusted/Self-Signed Certificate";
+            foundIssues.push(`[CRITICAL] Certificate Trust Error: ${errorMsg}`);
+            recommendations.push("Obtain a valid certificate from a trusted CA (e.g., Let's Encrypt).");
+          }
+        }
+
         if (foundIssues.length > 0) finalResults.overallStatus = "VULNERABLE";
 
         finalResults.scans.push({
           protocol: result.protocol,
           cipher: result.cipher,
+          status: result.authorized ? "SECURE" : "UNTRUSTED",
           issues: foundIssues,
           cert: result.cert,
           recommendations: [...new Set(recommendations)],
@@ -370,17 +353,43 @@ app.post("/api/audit", async (req, res) => {
       }
     }
 
-    // Finalize third-party data
-    const externalSafety = await externalSafetyPromise;
+    // 🛡️ CRYPTCHECK INTELLIGENCE RESOLUTION
     const cryptCheck = await cryptCheckPromise;
     
-    if (externalSafety.provider === 'SIMULATED') {
-      const vulnerabilities = finalResults.scans.flatMap(s => s.issues);
-      const score = Math.max(15, 100 - (vulnerabilities.length * 12));
-      externalSafety.score = score;
+    let externalScore = null;
+    let provider = 'CRYPTCHECK';
+
+    if (cryptCheck && cryptCheck.grade) {
+      const gradeMap = { 'A+': 100, 'A': 95, 'B': 80, 'C': 60, 'D': 40, 'E': 20, 'F': 0 };
+      externalScore = gradeMap[cryptCheck.grade] ?? 50;
     }
 
-    finalResults.externalSafety = externalSafety;
+    // Final Unified Score Resolution
+    const resultScore = { provider, score: externalScore };
+
+    // 🔍 ENHANCED SECURITY LOGIC: If no TLS protocols are supported, it's a critical failure.
+    if (finalResults.scans.length === 0 || (finalResults.scans.length === 1 && finalResults.scans[0].protocol === 'NONE_DETECTED')) {
+      finalResults.overallStatus = "VULNERABLE";
+      resultScore.score = 0; 
+      if (finalResults.scans.length === 0) {
+        finalResults.scans.push({
+          protocol: "NONE_DETECTED",
+          cipher: "PLAINTEXT_ONLY",
+          status: "UNSECURE",
+          issues: ["[CRITICAL] No TLS/SSL encryption detected. Data is transmitted in plaintext."],
+          recommendations: ["Immediately implement SSL/TLS (HTTPS) via Port 443."],
+          matchedVulnerabilities: [],
+          cert: null,
+          quickSnippet: "CRITICAL: This site is completely unencrypted."
+        });
+      }
+    } else if (resultScore.score === null) {
+      const vulnerabilities = finalResults.scans.flatMap(s => s.issues);
+      resultScore.score = Math.max(15, 100 - (vulnerabilities.length * 12));
+      resultScore.provider = 'SIMULATED';
+    }
+
+    finalResults.externalSafety = resultScore;
     finalResults.cryptCheck = cryptCheck;
     
     console.log(`[AUDIT_SUCCESS] ${host} - Scans: ${finalResults.scans.length}`);
