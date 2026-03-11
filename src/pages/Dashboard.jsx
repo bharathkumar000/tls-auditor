@@ -88,7 +88,6 @@ function DashboardPage({ user, onLogout }) {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const W = doc.internal.pageSize.getWidth();
     const vulnerabilities = auditResults.scans.flatMap(s => s.issues);
-    const matchedVulns = auditResults.scans.flatMap(s => s.matchedVulnerabilities || []);
     let safetyScoreLocal = auditResults.overallStatus === 'SECURE' ? 95 : Math.max(10, 100 - (vulnerabilities.length * 20));
     const extScore = auditResults.externalSafety?.score ?? safetyScoreLocal;
     const unified = Math.round((safetyScoreLocal * 0.4) + (extScore * 0.6));
@@ -103,128 +102,147 @@ function DashboardPage({ user, onLogout }) {
     doc.setFillColor(20, 20, 20);
     doc.rect(0, 0, W, 38, 'F');
     doc.setDrawColor(212, 175, 55);
-    doc.setLineWidth(0.5);
+    doc.setLineWidth(0.6);
     doc.line(0, 38, W, 38);
 
-    // ── Logo text ──
+    // ── Logo Section ──
     doc.setFont('courier', 'bold');
-    doc.setFontSize(20);
+    doc.setFontSize(22);
     doc.setTextColor(212, 175, 55);
-    doc.text('⚡ TLS_AUDITOR', 14, 20);
-    doc.setFontSize(7);
+    doc.text('⚡ TLS_AUDITOR', 15, 20);
+    doc.setFontSize(7.5);
     doc.setTextColor(150, 150, 150);
-    doc.text('CLASSIFIED SECURITY ASSESSMENT REPORT', 14, 28);
-    doc.text(`GENERATED: ${ts}`, 14, 33);
+    doc.text('CLASSIFIED SECURITY ASSESSMENT REPORT // V1.3.0', 15, 28);
+    doc.text(`MISSION_GENEREATED: ${ts}`, 15, 33);
+    
     doc.setFont('courier', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(180, 180, 180);
-    doc.text('CONFIDENTIAL // FOR AUTHORIZED PERSONNEL ONLY', W - 14, 20, { align: 'right' });
+    doc.text('CONFIDENTIAL // MISSION_CRITICAL', W - 15, 20, { align: 'right' });
 
-    // ── Target ──
+    // ── Target Identification ──
     let y = 50;
     doc.setFillColor(25, 25, 25);
-    doc.roundedRect(14, y - 5, W - 28, 16, 2, 2, 'F');
-    doc.setDrawColor(50, 50, 50);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(14, y - 5, W - 28, 16, 2, 2, 'S');
+    doc.roundedRect(15, y - 5, W - 30, 20, 2, 2, 'F');
+    doc.setDrawColor(60, 60, 60);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(15, y - 5, W - 30, 20, 2, 2, 'S');
+    
     doc.setFont('courier', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(9);
     doc.setTextColor(212, 175, 55);
-    doc.text('TARGET_ENDPOINT', 20, y + 2);
-    doc.setFont('courier', 'normal');
+    doc.text('TARGET_ENDPOINT_ID:', 22, y + 7);
+    
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(11);
     doc.setTextColor(255, 255, 255);
-    doc.text(auditResults.target, 75, y + 2);
-    y += 22;
+    doc.text(auditResults.target, 80, y + 7);
+    y += 28;
 
-    // ── Score Grid ──
+    // ── Tactical Score Grid ──
     const cards = [
-      { label: 'UNIFIED THREAT INDEX', value: `${unified}%`, color: unified >= 85 ? [39,201,63] : unified >= 60 ? [255,189,46] : [255,75,75] },
-      { label: 'INTERNAL AUDIT', value: `${safetyScoreLocal}%`, color: [212,175,55] },
+      { label: 'UNIFIED INDEX', value: `${unified}%`, color: unified >= 85 ? [39,201,63] : [212,175,55] },
+      { label: 'INTERNAL SCAN', value: `${safetyScoreLocal}%`, color: [212,175,55] },
       { label: 'EXTERNAL INTEL', value: `${extScore}%`, color: [81,175,239] },
-      { label: 'OVERALL STATUS', value: statusLabel, color: unified >= 85 ? [39,201,63] : unified >= 60 ? [255,189,46] : [255,75,75] },
+      { label: 'THREAT_STATUS', value: statusLabel, color: unified >= 85 ? [39,201,63] : unified >= 60 ? [212,175,55] : [255,75,75] },
     ];
-    const cardW = (W - 28 - 9) / 4;
+    
+    const cardW = (W - 30 - 9) / 4;
     cards.forEach((c, i) => {
-      const x = 14 + i * (cardW + 3);
-      doc.setFillColor(20, 20, 20);
-      doc.roundedRect(x, y, cardW, 24, 2, 2, 'F');
+      const x = 15 + i * (cardW + 3);
+      doc.setFillColor(22, 22, 22);
+      doc.roundedRect(x, y, cardW, 28, 2, 2, 'F');
       doc.setDrawColor(c.color[0], c.color[1], c.color[2]);
-      doc.setLineWidth(0.4);
-      doc.roundedRect(x, y, cardW, 24, 2, 2, 'S');
-      doc.setFont('courier', 'normal');
-      doc.setFontSize(5.5);
-      doc.setTextColor(150, 150, 150);
-      doc.text(c.label, x + cardW / 2, y + 7, { align: 'center' });
+      doc.setLineWidth(0.5);
+      doc.roundedRect(x, y, cardW, 28, 2, 2, 'S');
+      
       doc.setFont('courier', 'bold');
-      doc.setFontSize(12);
+      doc.setFontSize(6.5);
+      doc.setTextColor(150, 150, 150);
+      doc.text(c.label, x + cardW / 2, y + 9, { align: 'center' });
+      
+      doc.setFont('courier', 'bolder');
+      doc.setFontSize(13);
       doc.setTextColor(c.color[0], c.color[1], c.color[2]);
-      doc.text(c.value, x + cardW / 2, y + 18, { align: 'center' });
+      doc.text(c.value, x + cardW / 2, y + 21, { align: 'center' });
     });
-    y += 32;
+    y += 38;
 
-    // ── Intelligence source ──
+    // ── Intelligence Metadata ──
     doc.setFont('courier', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(120, 120, 120);
-    doc.text(`INTELLIGENCE_SOURCE: ${auditResults.externalSafety?.provider || 'UNKNOWN'}`, 14, y);
+    doc.setFontSize(7.5);
+    doc.setTextColor(140, 140, 140);
+    doc.text(`INTELLIGENCE_STREAM: ${auditResults.externalSafety?.provider || 'INTERNAL_SCANNER'}`, 15, y);
     y += 12;
 
-    // ── Section divider ──
-    doc.setDrawColor(40, 40, 40);
-    doc.setLineWidth(0.3);
-    doc.line(14, y, W - 14, y);
+    // ── Section Divider ──
+    doc.setDrawColor(50, 50, 50);
+    doc.setLineWidth(0.5);
+    doc.line(15, y, W - 15, y);
     doc.setFont('courier', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(9);
     doc.setTextColor(212, 175, 55);
-    doc.text('│ TLS_PROTOCOL_STACK_ANALYSIS', 14, y + 7);
-    y += 14;
+    doc.text('│ TLS_PROTOCOL_STACK_ANALYSIS', 15, y + 8);
+    y += 16;
 
-    // ── Protocol entries ──
+    // ── Protocol Stack Entries ──
     auditResults.scans.forEach((scan, i) => {
-      if (y > 270) { doc.addPage(); doc.setFillColor(10,10,10); doc.rect(0,0,W,297,'F'); y = 20; }
+      const blockHeight = Math.max(22, 15 + scan.issues.length * 8);
+      if (y + blockHeight > 275) { 
+        doc.addPage(); 
+        doc.setFillColor(10, 10, 10); 
+        doc.rect(0, 0, W, 297, 'F'); 
+        y = 30; 
+      }
+      
       doc.setFillColor(18, 18, 18);
-      doc.roundedRect(14, y, W - 28, scan.issues.length > 0 ? 10 + scan.issues.length * 7 : 16, 2, 2, 'F');
+      doc.roundedRect(15, y, W - 30, blockHeight, 2, 2, 'F');
+      doc.setDrawColor(40, 40, 40);
+      doc.roundedRect(15, y, W - 30, blockHeight, 2, 2, 'S');
 
-      const statusColor = scan.status === 'SECURE' ? [39,201,63] : [255,189,46];
       doc.setFont('courier', 'bold');
-      doc.setFontSize(7.5);
-      doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
-      doc.text(`[${String(i+1).padStart(2,'0')}]  ${scan.protocol} :: ${scan.cipher}`, 20, y + 7);
+      doc.setFontSize(8.5);
+      const protoColor = scan.status === 'SECURE' ? [39,201,63] : [212,175,55];
+      doc.setTextColor(protoColor[0], protoColor[1], protoColor[2]);
+      doc.text(`[${String(i+1).padStart(2,'0')}] ${scan.protocol} :: ${scan.cipher}`, 22, y + 8);
 
       doc.setFont('courier', 'normal');
-      doc.setFontSize(6);
-      doc.setTextColor(100, 100, 100);
-      doc.text('Extraction methodology: Active certificate handshake analysis.', 20, y + 13);
+      doc.setFontSize(6.5);
+      doc.setTextColor(120, 120, 120);
+      doc.text('Extraction methodology: Active hardware-level handshake analysis.', 22, y + 14);
 
-      let issY = y + 19;
+      let issY = y + 21;
       scan.issues.forEach(iss => {
-        const c = iss.startsWith('[CRITICAL]') ? [255,75,75] : iss.startsWith('[HIGH]') ? [255,189,46] : [224,172,87];
-        doc.setFont('courier', 'normal');
-        doc.setFontSize(5.8);
+        const c = iss.indexOf('CRITICAL') !== -1 ? [255,75,75] : iss.indexOf('HIGH') !== -1 ? [255,189,46] : [212,175,55];
+        doc.setFont('courier', 'bold');
+        doc.setFontSize(6);
         doc.setTextColor(c[0], c[1], c[2]);
-        const lines = doc.splitTextToSize(`  ${iss}`, W - 40);
-        doc.text(lines, 22, issY);
-        issY += lines.length * 5.5;
+        const cleanIss = iss.replace(/^\[.*?\]\s*/, '');
+        const prefix = iss.match(/^\[.*?\]/)?.[0] || '';
+        
+        const lines = doc.splitTextToSize(`${prefix} ${cleanIss}`, W - 45);
+        doc.text(lines, 24, issY);
+        issY += lines.length * 6;
       });
 
-      y += (scan.issues.length > 0 ? 14 + scan.issues.length * 7 : 20);
+      y += blockHeight + 6;
     });
 
-    // ── Footer ──
+    // ── Immutable Footer ──
     const totalPages = doc.getNumberOfPages();
     for (let p = 1; p <= totalPages; p++) {
       doc.setPage(p);
-      doc.setDrawColor(40, 40, 40);
-      doc.setLineWidth(0.3);
-      doc.line(14, 285, W - 14, 285);
+      doc.setDrawColor(50, 50, 50);
+      doc.setLineWidth(0.4);
+      doc.line(15, 285, W - 15, 285);
       doc.setFont('courier', 'normal');
-      doc.setFontSize(5.5);
-      doc.setTextColor(80, 80, 80);
-      doc.text('TLS_AUDITOR // CLASSIFIED REPORT', 14, 290);
-      doc.text(`Page ${p} of ${totalPages}`, W - 14, 290, { align: 'right' });
+      doc.setFontSize(6);
+      doc.setTextColor(100, 100, 100);
+      doc.text('TLS_AUDITOR // SECURITY_INTELLIGENCE // MISSION_LOGS', 15, 291);
+      doc.text(`OP_SEQUENCE: ${p} / ${totalPages}`, W - 15, 291, { align: 'right' });
     }
 
-    doc.save(`TLS_AUDIT_${auditResults.target.replace(/[^a-z0-9]/gi,'_')}_${Date.now()}.pdf`);
+    doc.save(`TLS_AUDIT_${auditResults.target.replace(/[^a-z0-9]/gi,'_')}_REPT.pdf`);
   };
 
   if (showResults && auditResults) {
@@ -263,47 +281,54 @@ function DashboardPage({ user, onLogout }) {
         </header>
 
         <div className="safety-grid">
-          <div className="safety-score-card" style={{ maxWidth: '800px' }}>
-            {/* ── TOP: THE CENTERED CIRCLE ── */}
-            <p className="percentage-label">Visual Threat Vector</p>
-            <div className="chart-container" style={{ margin: '2rem 0' }}>
-              <svg viewBox="0 0 110 110" className="circular-chart" style={{ width: '260px', height: '260px' }}>
-                <circle className="circle-bg" cx="55" cy="55" r="50"></circle>
-                <circle className="circle" cx="55" cy="55" r="50" style={{ strokeDasharray, stroke: statusObj.color, strokeWidth: '4' }}></circle>
-                <circle className="circle-bg" cx="55" cy="55" r="38" style={{ strokeWidth: '2', opacity: '0.3' }}></circle>
-                <circle className="circle" cx="55" cy="55" r="38" style={{ strokeDasharray: strokeDasharrayExternal, stroke: '#51afef', strokeWidth: '3.5', opacity: '0.8' }}></circle>
-              </svg>
-              
-              <div className="chart-legend">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: statusObj.color, boxShadow: `0 0 10px ${statusObj.color}40` }}></div> UNIFIED
+          <div className="safety-score-card" style={{ maxWidth: '1000px' }}>
+            <div className="report-split-container">
+              {/* ── LEFT NODE: METRICS ── */}
+              <div className="report-right-node"> {/* Using right-node class for styling but placing on left */}
+                <p className="percentage-label">Unified Threat Index</p>
+                <h2 className="percentage-value" style={{ color: statusObj.color, fontSize: '6rem' }}>{safetyScore}%</h2>
+                
+                <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'center', gap: '2rem' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ color: 'var(--text-gray)', fontSize: '0.65rem', marginBottom: '0.2rem', letterSpacing: '0.1em' }}>INTERNAL</div>
+                    <div style={{ color: 'var(--gold-primary)', fontWeight: '900', fontSize: '1.1rem' }}>{safetyScoreLocal}%</div>
+                  </div>
+                  <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }}></div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ color: 'var(--text-gray)', fontSize: '0.65rem', marginBottom: '0.2rem', letterSpacing: '0.1em' }}>EXTERNAL</div>
+                    <div style={{ color: '#51afef', fontWeight: '900', fontSize: '1.1rem' }}>{externalScore}%</div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#51afef', boxShadow: '0 0 10px rgba(81, 175, 239, 0.4)' }}></div> EXTERNAL
+
+                <div style={{ marginTop: '2rem', background: `${statusObj.color}20`, padding: '0.5rem 1.5rem', borderRadius: '2rem', display: 'inline-block', fontWeight: '900', color: statusObj.color, border: `1px solid ${statusObj.color}40`, letterSpacing: '0.1em', fontSize: '0.9rem' }}>
+                  STATUS: {statusObj.text}
                 </div>
               </div>
-            </div>
 
-            {/* ── MIDDLE: THE TEXT STATS ── */}
-            <div style={{ width: '60%', height: '1px', background: 'rgba(255,255,255,0.08)', margin: '2rem 0' }}></div>
+              {/* ── TACTICAL DIVIDER ── */}
+              <div className="vertical-divider"></div>
 
-            <p className="percentage-label">Unified Threat Index</p>
-            <h2 className="percentage-value" style={{ color: statusObj.color, fontSize: '5.5rem' }}>{safetyScore}%</h2>
-            
-            <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'center', gap: '3rem' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ color: 'var(--text-gray)', fontSize: '0.7rem', marginBottom: '0.3rem', letterSpacing: '0.1em' }}>INTERNAL_AUDIT</div>
-                <div style={{ color: 'var(--gold-primary)', fontWeight: '900', fontSize: '1.2rem' }}>{safetyScoreLocal}%</div>
+              {/* ── RIGHT NODE: RADAR ── */}
+              <div className="report-left-node"> {/* Using left-node class for styling but placing on right */}
+                <p className="percentage-label">Visual Threat Vector</p>
+                <div className="chart-container">
+                  <svg viewBox="0 0 110 110" className="circular-chart" style={{ width: '280px', height: '280px' }}>
+                    <circle className="circle-bg" cx="55" cy="55" r="50"></circle>
+                    <circle className="circle" cx="55" cy="55" r="50" style={{ strokeDasharray, stroke: statusObj.color, strokeWidth: '4' }}></circle>
+                    <circle className="circle-bg" cx="55" cy="55" r="38" style={{ strokeWidth: '2', opacity: '0.3' }}></circle>
+                    <circle className="circle" cx="55" cy="55" r="38" style={{ strokeDasharray: strokeDasharrayExternal, stroke: '#51afef', strokeWidth: '3.5', opacity: '0.8' }}></circle>
+                  </svg>
+                  
+                  <div className="chart-legend">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: statusObj.color, boxShadow: `0 0 10px ${statusObj.color}40` }}></div> UNIFIED
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#51afef', boxShadow: '0 0 10px rgba(81, 175, 239, 0.4)' }}></div> EXTERNAL
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div style={{ width: '2px', background: 'rgba(212,175,55,0.1)' }}></div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ color: 'var(--text-gray)', fontSize: '0.7rem', marginBottom: '0.3rem', letterSpacing: '0.1em' }}>EXTERNAL_INTEL</div>
-                <div style={{ color: '#51afef', fontWeight: '900', fontSize: '1.2rem' }}>{externalScore}%</div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '2.5rem', background: `${statusObj.color}20`, padding: '0.6rem 1.5rem', borderRadius: '2rem', display: 'inline-block', fontWeight: '900', color: statusObj.color, border: `1px solid ${statusObj.color}40`, letterSpacing: '0.1em' }}>
-              STATUS: {statusObj.text}
             </div>
 
             <div style={{ marginTop: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem', width: '100%' }}>
@@ -365,13 +390,13 @@ function DashboardPage({ user, onLogout }) {
           <h1 className="title">TLS_SECURITY_AUDITOR</h1>
           <p className="subtitle">High-Fidelity Automated Infrastructure Scanning</p>
         </div>
-        <div className="dev-badge">OPERATOR_ACCESS_NODE // {user?.phone}</div>
+        <div className="dev-badge">OPERATOR_ACCESS_NODE // {user?.phone || user?.email}</div>
       </header>
 
       <div className="stats-grid" style={{ marginBottom: '2.5rem' }}>
         <div className="stat-card">
           <div className="stat-header"><Shield size={14} /> ACCESS_NODE</div>
-          <div className="stat-value">{user?.phone}</div>
+          <div className="stat-value">{user?.phone || user?.email}</div>
           <div className="stat-footer">IP_ENCRYPTED_TUNNEL</div>
         </div>
         <div className="stat-card">
