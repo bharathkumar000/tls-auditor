@@ -742,3 +742,510 @@ body {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ═══════════════════════════════════════════════════════
+   VULNERABILITY DATABASE STYLES
+   ═══════════════════════════════════════════════════════ */
+
+.vuln-summary-bar {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.vuln-stat-pill {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  padding: 1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 120px;
+  backdrop-filter: blur(10px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.vuln-stat-pill:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.vuln-stat-count {
+  font-size: 2rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.vuln-stat-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-gray);
+  font-weight: 600;
+}
+
+.vuln-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.vuln-search-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--card-bg);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.75rem;
+  padding: 0.6rem 1rem;
+  flex: 1;
+  min-width: 200px;
+  max-width: 400px;
+  transition: border-color 0.3s ease;
+}
+
+.vuln-search-wrapper:focus-within {
+  border-color: var(--gold-primary);
+}
+
+.vuln-search-input {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 0.85rem;
+  font-family: var(--font-mono);
+  flex: 1;
+  outline: none;
+}
+
+.vuln-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.vuln-clear-btn {
+  background: none;
+  border: none;
+  color: var(--text-gray);
+  cursor: pointer;
+  padding: 0.2rem;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s ease;
+}
+
+.vuln-clear-btn:hover {
+  color: white;
+}
+
+.vuln-filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.vuln-filter-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-gray);
+  padding: 0.4rem 0.9rem;
+  border-radius: 2rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-mono);
+}
+
+.vuln-filter-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+
+.vuln-filter-btn.active {
+  font-weight: 700;
+}
+
+/* ── Vulnerability Table ── */
+
+.vuln-table-container {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  overflow: hidden;
+  margin-bottom: 2rem;
+  backdrop-filter: blur(10px);
+}
+
+.vuln-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.vuln-table thead {
+  background: rgba(212, 175, 55, 0.06);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.vuln-table th {
+  padding: 0.9rem 1rem;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-primary);
+  font-weight: 600;
+}
+
+.vuln-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  vertical-align: top;
+}
+
+.vuln-row {
+  transition: background 0.2s ease;
+}
+
+.vuln-row:hover {
+  background: rgba(212, 175, 55, 0.04);
+}
+
+.vuln-id {
+  font-family: var(--font-mono);
+  color: var(--text-gray);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.vuln-cipher-name {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.vuln-cipher-name code {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: #dcdcdc;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.3rem;
+  display: inline-block;
+  word-break: break-all;
+}
+
+.vuln-rationale-hint {
+  font-size: 0.72rem;
+  color: var(--text-gray);
+  opacity: 0.7;
+  line-height: 1.4;
+}
+
+.vuln-category-badge {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--gold-primary);
+  background: rgba(212, 175, 55, 0.1);
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.4rem;
+  display: inline-block;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.vuln-severity-badge {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 2rem;
+  border: 1px solid;
+  display: inline-block;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.vuln-fix {
+  font-size: 0.8rem;
+}
+
+.vuln-fix-text {
+  color: #98be65;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.vuln-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem;
+  color: var(--text-gray);
+  font-size: 0.85rem;
+}
+
+/* ── Severity Legend ── */
+
+.vuln-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.5rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  margin-bottom: 3rem;
+}
+
+.vuln-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-gray);
+}
+
+.vuln-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Matched Vulnerabilities Bar (in Audit Results) ── */
+
+.matched-vulns-bar {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.matched-vulns-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--gold-primary);
+  margin-bottom: 1rem;
+}
+
+.matched-vulns-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.matched-vuln-pill {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem;
+  border-radius: 2rem;
+  border: 1px solid;
+  cursor: default;
+  transition: transform 0.15s ease;
+  letter-spacing: 0.03em;
+}
+
+.matched-vuln-pill:hover {
+  transform: scale(1.05);
+}
+
+.matched-vulns-summary {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+}
+
+/* ── Responsive Overrides for Vuln DB ── */
+
+@media (max-width: 768px) {
+  .vuln-summary-bar {
+    flex-direction: column;
+  }
+  
+  .vuln-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .vuln-search-wrapper {
+    max-width: 100%;
+  }
+  
+  .vuln-table {
+    font-size: 0.75rem;
+  }
+  
+  .vuln-table th,
+  .vuln-table td {
+    padding: 0.5rem;
+  }
+  
+  .vuln-cipher-name code {
+    font-size: 0.7rem;
+  }
+  
+  .matched-vulns-summary {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
+/* ── Animate spin for loader ── */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ═══════════════════════════════════════════════════════
+   CIPHER PREVIEW SECTION (DASHBOARD)
+   ═══════════════════════════════════════════════════════ */
+
+.cipher-preview-section {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  border-left: 4px solid var(--gold-primary);
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--gold-primary);
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.safety-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.quick-suggestion {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: rgba(212, 175, 55, 0.1);
+  border-left: 2px solid var(--gold-primary);
+  border-radius: 0 0.5rem 0.5rem 0;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  color: var(--gold-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.vuln-issue {
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.cipher-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.cipher-preview-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  transition: all 0.2s ease;
+}
+
+.cipher-preview-item:hover {
+  background: rgba(212, 175, 55, 0.05);
+  border-color: rgba(212, 175, 55, 0.2);
+  transform: translateX(5px);
+}
+
+.cipher-preview-item .proto {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--gold-primary);
+  opacity: 0.8;
+  font-weight: 700;
+}
+
+.cipher-preview-item .cipher {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: #e0e0e0;
+  word-break: break-all;
+}
+
+.generate-report-btn {
+  width: 100%;
+  background: linear-gradient(90deg, var(--gold-primary), #b8860b);
+  color: black;
+  border: none;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.2);
+}
+
+.generate-report-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.2);
+  box-shadow: 0 6px 25px rgba(212, 175, 55, 0.4);
+}
+
+.generate-report-btn:active {
+  transform: translateY(0);
+}

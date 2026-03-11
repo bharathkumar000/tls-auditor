@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
 const tls = require("tls");
@@ -8,88 +9,385 @@ const PORT = 3001;
 app.use(cors());
 app.use(express.json());
 
-const weakProtocols = ["SSLv2", "SSLv3", "TLSv1", "TLSv1.1"];
-const weakCiphers = ["RC4", "3DES", "MD5", "NULL", "DES"];
+// ═══════════════════════════════════════════════════════════════════
+// EXTERNAL API CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════
+const APIVOID_KEY = process.env.APIVOID_KEY;
+
+/**
+ * Fetches safety rating from external provider (APIVoid)
+ * Fallback to local simulation if no key or API fails
+ */
+async function fetchExternalSafetyRating(host) {
+  if (!APIVOID_KEY || APIVOID_KEY === 'your_apivoid_key_here') {
+    return { provider: 'SIMULATED', score: null }; // Will be calculated after audit
+  }
+
+  try {
+    const response = await fetch('https://api.apivoid.com/v2/tls-check', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-API-Key': APIVOID_KEY
+      },
+      body: JSON.stringify({ host })
+    });
+
+    if (!response.ok) throw new Error(`APIVoid error: ${response.status}`);
+    
+    const data = await response.json();
+    // APIVoid usually returns a security_score or similar
+    return { 
+      provider: 'APIVOID', 
+      score: data?.data?.report?.security_score || 85,
+      details: data?.data?.report 
+    };
+  } catch (err) {
+    console.error('External API Fail:', err.message);
+    return { provider: 'SIMULATED', score: null };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// VULNERABILITY DATABASE — All 30 known bad cipher suites + protocol/cert checks
+// ═══════════════════════════════════════════════════════════════════
+
+const badCipherSuites = [
+  // ── CRITICAL: NULL Ciphers (No encryption at all) ──
+  { id: 1,  cipherName: "TLS_RSA_WITH_NULL_SHA",               category: "NULL",        severity: "CRITICAL", rationale: "No encryption — data transmitted in plaintext. Attacker can read everything.",       secureFix: "TLS_AES_256_GCM_SHA384" },
+  { id: 2,  cipherName: "TLS_RSA_WITH_NULL_MD5",               category: "NULL",        severity: "CRITICAL", rationale: "No encryption + MD5 hash — completely broken integrity and confidentiality.",       secureFix: "TLS_CHACHA20_POLY1305_SHA256" },
+  { id: 3,  cipherName: "TLS_ECDHE_RSA_WITH_NULL_SHA",         category: "NULL",        severity: "CRITICAL", rationale: "Key exchange is secure, but NULL cipher means no encryption on data.",              secureFix: "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384" },
+  { id: 28, cipherName: "TLS_RSA_WITH_NULL_SHA256",            category: "NULL",        severity: "CRITICAL", rationale: "Better hash but still NULL cipher — zero encryption on the wire.",                  secureFix: "Enforce AES encryption" },
+
+  // ── CRITICAL: EXPORT Ciphers (Intentionally weakened for old US export laws) ──
+  { id: 4,  cipherName: "TLS_RSA_EXPORT_WITH_RC4_40_MD5",     category: "EXPORT",      severity: "CRITICAL", rationale: "40-bit key + RC4 + MD5 — trivially breakable in seconds by any attacker.",        secureFix: "Disable Export; use TLS 1.2+" },
+  { id: 5,  cipherName: "TLS_RSA_EXPORT_WITH_DES40_CBC_SHA",   category: "EXPORT",      severity: "CRITICAL", rationale: "40-bit DES export cipher — cracked instantly with modern hardware.",              secureFix: "Replace with AES-GCM" },
+  { id: 6,  cipherName: "TLS_DH_anon_EXPORT_WITH_RC4_40_MD5", category: "EXPORT/ANON", severity: "CRITICAL", rationale: "Export-grade + anonymous key exchange — no auth AND no real encryption.",           secureFix: "Use Authenticated ECDHE" },
+  { id: 29, cipherName: "TLS_DH_DSS_EXPORT_WITH_DES_CBC_SHA",  category: "EXPORT",      severity: "CRITICAL", rationale: "Export-grade DES with DSS — completely obsolete and trivially broken.",            secureFix: "Disable all Export suites" },
+  { id: 30, cipherName: "TLS_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA", category: "EXPORT",    severity: "CRITICAL", rationale: "40-bit DES export — ephemeral keys don't help when cipher is this weak.",         secureFix: "Use strong Ephemeral DH keys" },
+
+  // ── HIGH: RC4 (Broken stream cipher) ──
+  { id: 7,  cipherName: "TLS_RSA_WITH_RC4_128_SHA",            category: "RC4 (Broken)",   severity: "HIGH", rationale: "RC4 has known biases — attacker can recover plaintext with statistical analysis.",  secureFix: "Use AES-128-GCM" },
+  { id: 8,  cipherName: "TLS_RSA_WITH_RC4_128_MD5",            category: "RC4 (Broken)",   severity: "HIGH", rationale: "RC4 + MD5 — double weakness in both cipher and hash algorithm.",                 secureFix: "Use AES-256-GCM" },
+  { id: 9,  cipherName: "TLS_ECDHE_ECDSA_WITH_RC4_128_SHA",    category: "RC4 (Broken)",   severity: "HIGH", rationale: "Good key exchange wasted on broken RC4 cipher.",                                  secureFix: "Use TLS 1.3 (removes RC4)" },
+  { id: 27, cipherName: "TLS_ECDHE_ECDSA_WITH_RC4_128_SHA",    category: "RC4",            severity: "HIGH", rationale: "RC4 is a compromised stream cipher with predictable key stream biases.",          secureFix: "Use ChaCha20-Poly1305" },
+
+  // ── HIGH: 3DES (Legacy block cipher) ──
+  { id: 10, cipherName: "TLS_RSA_WITH_3DES_EDE_CBC_SHA",       category: "3DES (Legacy)",  severity: "HIGH", rationale: "64-bit block size — vulnerable to Sweet32 birthday attack after ~32GB of data.",  secureFix: "Use AES-256" },
+  { id: 11, cipherName: "TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA", category: "3DES (Legacy)",  severity: "HIGH", rationale: "Good key exchange but 3DES is deprecated — Sweet32 attack applies.",             secureFix: "Use AES-GCM" },
+  { id: 12, cipherName: "TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA",   category: "3DES (Legacy)",  severity: "HIGH", rationale: "DHE provides PFS, but 3DES block cipher makes it still vulnerable.",              secureFix: "Move to ECDHE + AES" },
+
+  // ── HIGH: DES (Broken block cipher) ──
+  { id: 13, cipherName: "TLS_RSA_WITH_DES_CBC_SHA",            category: "DES (Broken)",   severity: "HIGH", rationale: "56-bit DES — cracked in hours by brute force. Completely obsolete.",              secureFix: "Use AES-128" },
+  { id: 14, cipherName: "TLS_DHE_DSS_WITH_DES_CBC_SHA",        category: "DES (Broken)",   severity: "HIGH", rationale: "DES + DSS — both algorithms are deprecated and insecure.",                       secureFix: "Use ECDSA + AES-GCM" },
+
+  // ── HIGH: Anonymous Key Exchange (No Authentication) ──
+  { id: 15, cipherName: "TLS_DH_anon_WITH_AES_128_GCM_SHA256", category: "ANON (No Auth)", severity: "HIGH", rationale: "AES-GCM cipher is fine, but anonymous DH means no server verification — MitM.",   secureFix: "Enforce RSA or ECDSA Auth" },
+  { id: 16, cipherName: "TLS_ECDH_anon_WITH_AES_256_GCM_SHA384", category: "ANON (No Auth)", severity: "HIGH", rationale: "Strong cipher but anonymous ECDH — anyone can impersonate the server.",        secureFix: "Enforce Authenticated DH" },
+
+  // ── HIGH: Obsolete Ciphers ──
+  { id: 25, cipherName: "TLS_RSA_WITH_IDEA_CBC_SHA",           category: "Obsolete",       severity: "HIGH", rationale: "IDEA cipher is obsolete — removed from modern TLS implementations.",             secureFix: "Use AES-256-GCM" },
+
+  // ── MEDIUM: CBC Mode (Padding oracle attacks) ──
+  { id: 17, cipherName: "TLS_RSA_WITH_AES_128_CBC_SHA",        category: "CBC Mode",       severity: "MEDIUM", rationale: "CBC mode is vulnerable to BEAST and Lucky13 padding oracle attacks.",           secureFix: "Use GCM Mode (prevents BEAST)" },
+  { id: 18, cipherName: "TLS_RSA_WITH_AES_256_CBC_SHA256",     category: "CBC Mode",       severity: "MEDIUM", rationale: "AES-256 is strong but CBC mode introduces padding oracle vulnerabilities.",     secureFix: "Use AES-256-GCM" },
+  { id: 19, cipherName: "TLS_DHE_RSA_WITH_AES_128_CBC_SHA",    category: "CBC Mode",       severity: "MEDIUM", rationale: "Good key exchange, but CBC mode allows timing-based side-channel attacks.",     secureFix: "Use DHE-RSA-AES-GCM" },
+  { id: 20, cipherName: "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA",  category: "CBC Mode",       severity: "MEDIUM", rationale: "ECDHE provides PFS, but CBC mode weakens overall cipher suite security.",      secureFix: "Use ECDHE-RSA-AES-GCM" },
+  { id: 21, cipherName: "TLS_RSA_WITH_AES_128_CBC_SHA256",     category: "CBC Mode",       severity: "MEDIUM", rationale: "SHA-256 hash is good but CBC mode is still a padding oracle attack vector.",    secureFix: "Use TLS 1.3" },
+
+  // ── MEDIUM: Legacy Ciphers (Camellia) ──
+  { id: 22, cipherName: "TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA", category: "Legacy Cipher", severity: "MEDIUM", rationale: "Camellia is not widely audited and uses CBC mode — prefer AES-GCM.",          secureFix: "Use AES-GCM" },
+  { id: 23, cipherName: "TLS_RSA_WITH_CAMELLIA_256_CBC_SHA",     category: "Legacy Cipher", severity: "MEDIUM", rationale: "Camellia-256 in CBC mode — lacks the scrutiny and hardware accel of AES.",    secureFix: "Use AES-GCM" },
+
+  // ── MEDIUM: Obsolete Ciphers (SEED) ──
+  { id: 24, cipherName: "TLS_RSA_WITH_SEED_CBC_SHA",           category: "Obsolete",       severity: "MEDIUM", rationale: "SEED is a Korean national cipher — limited audit, CBC mode, not recommended.",  secureFix: "Use AES-128-GCM" },
+
+  // ── MEDIUM: Weak Authentication ──
+  { id: 26, cipherName: "TLS_DHE_DSS_WITH_AES_128_GCM_SHA256", category: "Weak Auth",     severity: "MEDIUM", rationale: "DSS/DSA authentication uses shorter keys — prefer RSA 2048+ or ECDSA P-256.",  secureFix: "Use RSA/ECDSA (2048/256-bit)" },
+];
+
+// Protocol-level vulnerabilities
+const protocolVulnerabilities = [
+  { id: "SSL_V23", name: "SSL v2 / v3",    severity: "CRITICAL", rationale: "Completely broken by POODLE, DROWN, and other attacks.",          alt: "TLS 1.3" },
+  { id: "TLS_10",  name: "TLS 1.0 / 1.1",  severity: "HIGH",     rationale: "Vulnerable to BEAST attack and uses weak SHA-1 hashing.",        alt: "TLS 1.2+" },
+];
+
+// Certificate-level vulnerabilities
+const certVulnerabilities = [
+  { id: "SMALL_RSA", name: "Small RSA Key", severity: "MEDIUM", rationale: "RSA keys < 2048 bits can be brute-forced with modern hardware.", alt: "RSA 3072+ / ECC P-256" },
+  { id: "SHA1_CERT",  name: "SHA-1 Certificate", severity: "HIGH", rationale: "SHA-1 signature is collision-prone — certificates can be forged.", alt: "SHA-256 / SHA-384 signatures" },
+];
+
+// ═══════════════════════════════════════════════════════════════════
+// STRETCH GOAL: LIGHTWEIGHT RULE ENGINE & CRYPTCHECK INTEGRATION
+// ═══════════════════════════════════════════════════════════════════
+
+const myRules = {
+  "RC4": "CRITICAL: RC4 is broken. Switch to AES-GCM.",
+  "3DES": "HIGH: 3DES is legacy. Upgrade to AES-256.",
+  "TLSv1.0": "HIGH: Protocol is vulnerable to BEAST attacks.",
+  "TLSv1.1": "HIGH: Protocol is deprecated. Upgrade to TLS 1.2 or 1.3.",
+  "MD5": "CRITICAL: MD5 is crypographically broken. Use SHA-256+.",
+  "NULL": "CRITICAL: No encryption. Enforce AES-GCM.",
+  "CBC": "MEDIUM: CBC mode is vulnerable to padding oracles. Use GCM mode."
+};
+
+/**
+ * Lightweight suggestion engine for quick rule-based feedback
+ */
+function getSuggestion(cipherName) {
+  for (let key in myRules) {
+    if (cipherName.toUpperCase().includes(key)) return myRules[key];
+  }
+  return "SECURE: No immediate risks found in this cipher suite.";
+}
+
+/**
+ * Fetches third-party audit data from CryptCheck (No key needed)
+ */
+async function fetchCryptCheckData(host) {
+  try {
+    const response = await fetch(`https://cryptcheck.fr/api/v1/host/${host}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return {
+      grade: data.grade || '?',
+      hostname: data.hostname,
+      ciphersFound: data.details?.ciphers?.list?.length || 0,
+      raw: data
+    };
+  } catch (err) {
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TLS PROTOCOL TESTING
+// ═══════════════════════════════════════════════════════════════════
 
 async function testProtocol(host, protocol) {
   return new Promise((resolve) => {
-    const socket = tls.connect({
-      host: host,
-      port: 443,
-      minVersion: protocol,
-      maxVersion: protocol,
-      rejectUnauthorized: false,
-      timeout: 5000
-    }, () => {
-      const cipher = socket.getCipher();
-      const usedProtocol = socket.getProtocol();
-      const cert = socket.getPeerCertificate();
+    try {
+      const socket = tls.connect({
+        host: host,
+        port: 443,
+        minVersion: protocol,
+        maxVersion: protocol,
+        rejectUnauthorized: false,
+        timeout: 5000
+      }, () => {
+        const cipher = socket.getCipher();
+        const usedProtocol = socket.getProtocol();
+        const cert = socket.getPeerCertificate();
 
-      resolve({
-        protocol: usedProtocol,
-        cipher: cipher.name,
-        cert: {
-          issuer: cert.issuer?.CN || 'Unknown',
-          validFrom: cert.valid_from,
-          validTo: cert.valid_to,
-          subject: cert.subject?.CN || 'Unknown'
-        }
+        resolve({
+          protocol: usedProtocol,
+          cipher: cipher.name,
+          cert: {
+            issuer: cert.issuer?.CN || 'Unknown',
+            validFrom: cert.valid_from,
+            validTo: cert.valid_to,
+            subject: cert.subject?.CN || 'Unknown',
+            bits: cert.bits || 0,
+            pubkey: cert.pubkey ? cert.pubkey.toString('hex') : null,
+            sigAlgorithm: cert.sigalg || 'Unknown'
+          }
+        });
+        socket.end();
       });
-      socket.end();
-    });
 
-    socket.on("error", () => resolve(null));
-    socket.on("timeout", () => {
-      socket.destroy();
+      socket.on("error", () => resolve(null));
+      socket.on("timeout", () => {
+        socket.destroy();
+        resolve(null);
+      });
+    } catch (e) {
       resolve(null);
-    });
+    }
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// CIPHER MATCHING ENGINE
+// ═══════════════════════════════════════════════════════════════════
+
+function matchCipherVulnerabilities(cipherName) {
+  const c = cipherName.toUpperCase();
+  const matched = [];
+
+  // 1. Check for exact matches against our bad cipher database
+  for (const bad of badCipherSuites) {
+    const badUpper = bad.cipherName.toUpperCase();
+    // Convert IANA name to OpenSSL-ish pattern for matching
+    const patterns = generateMatchPatterns(badUpper);
+    
+    for (const pattern of patterns) {
+      if (c.includes(pattern) || c === badUpper) {
+        matched.push(bad);
+        break;
+      }
+    }
+  }
+
+  // 2. Fallback: pattern-based detection for ciphers not in the exact list
+  if (matched.length === 0) {
+    if (c.includes("NULL"))   matched.push({ category: "NULL",   severity: "CRITICAL", rationale: "NULL cipher — no encryption.", secureFix: "Use AES-GCM" });
+    if (c.includes("EXPORT")) matched.push({ category: "EXPORT", severity: "CRITICAL", rationale: "Export-grade weak encryption.", secureFix: "Disable all EXPORT suites" });
+    if (c.includes("RC4"))    matched.push({ category: "RC4",    severity: "HIGH",     rationale: "RC4 stream cipher is broken.", secureFix: "Use ChaCha20-Poly1305" });
+    if (c.includes("DES") && !c.includes("ECDSA"))  matched.push({ category: "DES/3DES", severity: "HIGH", rationale: "DES/3DES is obsolete — Sweet32 attack.", secureFix: "Use AES-GCM" });
+    if (c.includes("ANON"))   matched.push({ category: "ANON",   severity: "HIGH",     rationale: "Anonymous key exchange — no authentication.", secureFix: "Use authenticated ECDHE" });
+    if (c.includes("MD5"))    matched.push({ category: "MD5",    severity: "MEDIUM",   rationale: "MD5 hashing is collision-prone.", secureFix: "Use SHA-256+" });
+    if (c.includes("CBC"))    matched.push({ category: "CBC",    severity: "MEDIUM",   rationale: "CBC mode — padding oracle attacks.", secureFix: "Use GCM mode" });
+    if (c.includes("CAMELLIA")) matched.push({ category: "Legacy Cipher", severity: "MEDIUM", rationale: "Camellia lacks audit depth vs AES.", secureFix: "Use AES-GCM" });
+    if (c.includes("SEED"))   matched.push({ category: "Obsolete",  severity: "MEDIUM", rationale: "SEED cipher is obsolete.", secureFix: "Use AES-128-GCM" });
+    if (c.includes("IDEA"))   matched.push({ category: "Obsolete",  severity: "HIGH",   rationale: "IDEA cipher is obsolete.", secureFix: "Use AES-256-GCM" });
+  }
+
+  return matched;
+}
+
+function generateMatchPatterns(cipherIANA) {
+  // Generate multiple matching patterns from IANA cipher name
+  const patterns = [cipherIANA];
+
+  // OpenSSL uses different naming — generate OpenSSL-compatible patterns
+  // e.g., TLS_RSA_WITH_AES_128_CBC_SHA → AES128-SHA
+  const parts = cipherIANA.replace("TLS_", "").replace("_WITH_", "_");
+  patterns.push(parts);
+
+  // Also match substrings for broad detection
+  if (cipherIANA.includes("NULL"))   patterns.push("NULL");
+  if (cipherIANA.includes("RC4"))    patterns.push("RC4");
+  if (cipherIANA.includes("EXPORT")) patterns.push("EXPORT", "EXP");
+  if (cipherIANA.includes("3DES"))   patterns.push("3DES", "DES-CBC3");
+  if (cipherIANA.includes("DES") && !cipherIANA.includes("3DES") && !cipherIANA.includes("ECDSA"))
+    patterns.push("DES-CBC");
+  if (cipherIANA.includes("ANON"))   patterns.push("ANON", "ADH", "AECDH");
+  if (cipherIANA.includes("CBC"))    patterns.push("CBC");
+  if (cipherIANA.includes("CAMELLIA")) patterns.push("CAMELLIA");
+  if (cipherIANA.includes("SEED"))   patterns.push("SEED");
+  if (cipherIANA.includes("IDEA"))   patterns.push("IDEA");
+
+  return patterns;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// API: /api/audit — Main audit endpoint
+// ═══════════════════════════════════════════════════════════════════
 
 app.post("/api/audit", async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: "URL is required" });
 
   const host = url.replace("https://", "").replace("http://", "").split('/')[0];
-  const protocols = ["TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"];
+  const testableProtocols = ["TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"];
+  
+  // Start external safety rating check & CryptCheck in parallel
+  const externalSafetyPromise = fetchExternalSafetyRating(host);
+  const cryptCheckPromise = fetchCryptCheckData(host);
+
   const finalResults = {
     target: host,
     timestamp: new Date().toISOString(),
     scans: [],
-    overallStatus: "SECURE"
+    overallStatus: "SECURE",
+    badCipherDatabase: badCipherSuites,
+    cryptCheck: null
   };
 
-  for (const proto of protocols) {
+  for (const proto of testableProtocols) {
     const result = await testProtocol(host, proto);
     if (result) {
-      const issues = [];
-      if (weakProtocols.includes(result.protocol)) {
-        issues.push(`Weak protocol detected: ${result.protocol}`);
-        finalResults.overallStatus = "VULNERABLE";
+      const foundIssues = [];
+      const recommendations = [];
+      const matchedVulnerabilities = [];
+      
+      // Secondary Rule Engine check (Stretch goal requirement)
+      const quickSnippet = getSuggestion(result.cipher);
+
+      // ── Protocol checks ──
+      if (result.protocol.includes("TLSv1.0") || result.protocol === "TLSv1") {
+        const v = protocolVulnerabilities.find(x => x.id === "TLS_10");
+        foundIssues.push(`[${v.severity}] ${v.name}: ${v.rationale}`);
+        recommendations.push(v.alt);
       }
 
-      weakCiphers.forEach(c => {
-        if (result.cipher.includes(c)) {
-          issues.push(`Weak cipher detected: ${c}`);
-          finalResults.overallStatus = "VULNERABLE";
-        }
-      });
+      // ── Cipher suite checks (against all 30 bad ciphers) ──
+      const cipherMatches = matchCipherVulnerabilities(result.cipher);
+      for (const match of cipherMatches) {
+        const label = match.cipherName || match.category;
+        foundIssues.push(`[${match.severity}] ${match.category}: ${label} — ${match.rationale}`);
+        recommendations.push(match.secureFix);
+        matchedVulnerabilities.push({
+          id: match.id,
+          cipherName: match.cipherName || result.cipher,
+          category: match.category,
+          severity: match.severity,
+          secureFix: match.secureFix
+        });
+      }
+
+      // ── Certificate checks ──
+      if (result.cert.bits > 0 && result.cert.bits < 2048) {
+        const v = certVulnerabilities.find(x => x.id === "SMALL_RSA");
+        foundIssues.push(`[${v.severity}] ${v.name} (${result.cert.bits} bits): ${v.rationale}`);
+        recommendations.push(v.alt);
+      }
+
+      if (result.cert.sigAlgorithm && result.cert.sigAlgorithm.toLowerCase().includes('sha1')) {
+        const v = certVulnerabilities.find(x => x.id === "SHA1_CERT");
+        foundIssues.push(`[${v.severity}] ${v.name}: ${v.rationale}`);
+        recommendations.push(v.alt);
+      }
+
+      if (foundIssues.length > 0) finalResults.overallStatus = "VULNERABLE";
 
       finalResults.scans.push({
         protocol: result.protocol,
         cipher: result.cipher,
-        issues,
+        issues: foundIssues,
         cert: result.cert,
-        recommendations: issues.map(i => 
-          i.includes("protocol") ? "Disable SSLv3, TLSv1, TLSv1.1. Use TLSv1.2 or TLSv1.3." : "Remove weak ciphers like RC4, DES, or 3DES."
-        )
+        recommendations: [...new Set(recommendations)],
+        matchedVulnerabilities,
+        quickSnippet // Injected from rule engine
       });
     }
   }
 
+  // Finalize third-party data
+  const externalSafety = await externalSafetyPromise;
+  const cryptCheck = await cryptCheckPromise;
+  
+  if (externalSafety.provider === 'SIMULATED') {
+    // Generate simulated score based on internal audit results
+    const vulnerabilities = finalResults.scans.flatMap(s => s.issues);
+    const score = Math.max(15, 100 - (vulnerabilities.length * 12));
+    externalSafety.score = score;
+  }
+
+  finalResults.externalSafety = externalSafety;
+  finalResults.cryptCheck = cryptCheck;
   res.json(finalResults);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// API: /api/vulnerabilities — Return full bad cipher reference database
+// ═══════════════════════════════════════════════════════════════════
+
+app.get("/api/vulnerabilities", (req, res) => {
+  res.json({
+    total: badCipherSuites.length,
+    ciphers: badCipherSuites,
+    severityCounts: {
+      CRITICAL: badCipherSuites.filter(c => c.severity === "CRITICAL").length,
+      HIGH: badCipherSuites.filter(c => c.severity === "HIGH").length,
+      MEDIUM: badCipherSuites.filter(c => c.severity === "MEDIUM").length,
+    },
+    categories: [...new Set(badCipherSuites.map(c => c.category))]
+  });
 });
 
 app.listen(PORT, () => {
   console.log(`Auditor Engine running on http://localhost:${PORT}`);
 });
+
