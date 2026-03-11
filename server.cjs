@@ -24,22 +24,46 @@ let databaseInsecureCiphers = [];
 /**
  * Syncs the local engine with the master insecure_ciphers table
  */
+/**
+ * Syncs the local engine with the master cipher_suites and insecure_ciphers tables.
+ * This establishes a unified threat intelligence database for point-of-scan verification.
+ */
 async function syncVulnerabilityDatabase() {
   try {
-    const { data, error } = await supabase
-      .from('insecure_ciphers')
-      .select('*');
-    if (error) throw error;
-    databaseInsecureCiphers = data.map(c => ({
-      cipherName: c.cipher_suite_name,
-      category: c.issue_category,
-      severity: c.severity,
-      rationale: `Vulnerability detected in ${c.issue_category} category.`,
-      secureFix: c.recommended_fix
-    }));
-    console.log(`[DB_SYNC] Synchronized ${databaseInsecureCiphers.length} insecure ciphers from Supabase.`);
+    // Parallel ingestion from both tactical tables
+    const [insecureRes, suitesRes] = await Promise.all([
+      supabase.from('insecure_ciphers').select('*'),
+      supabase.from('cipher_suites').select('*')
+    ]);
+
+    const consolidated = [];
+    
+    if (insecureRes.data) {
+      insecureRes.data.forEach(c => consolidated.push({
+        cipherName: c.cipher_suite_name,
+        category: c.issue_category,
+        severity: c.severity,
+        rationale: `Vulnerability detected in ${c.issue_category} category.`,
+        secureFix: c.recommended_fix
+      }));
+    }
+
+    if (suitesRes.data) {
+      suitesRes.data.forEach(c => consolidated.push({
+        cipherName: c.iana_name || c.cipher_suite_name,
+        category: c.issue_category,
+        severity: c.severity,
+        rationale: `Vulnerability detected: ${c.issue_category}.`,
+        secureFix: c.secure_fix || c.recommended_fix
+      }));
+    }
+
+    // De-duplication of mission records
+    databaseInsecureCiphers = Array.from(new Map(consolidated.map(item => [item.cipherName, item])).values());
+    
+    console.log(`[DB_SYNC] Ingested ${databaseInsecureCiphers.length} unique threat signatures from Supabase.`);
   } catch (err) {
-    console.warn(`[DB_SYNC_FAIL] Using local fallback: ${err.message}`);
+    console.warn(`[DB_SYNC_FAIL] Infrastructure link lost. Using local fallback: ${err.message}`);
   }
 }
 
@@ -197,6 +221,7 @@ async function testProtocol(host, protocol) {
         resolve({
           protocol: usedProtocol,
           cipher: cipher?.name || 'Unknown',
+          cipherBits: cipher?.bits || 0,
           cert: safeCert,
           authorized: socket.authorized,
           authError: socket.authorizationError
@@ -320,10 +345,16 @@ app.post("/api/audit", async (req, res) => {
         const quickSnippet = getSuggestion(result.cipher);
 
         // ── Protocol checks ──
-        if (result.protocol.includes("TLSv1.0") || result.protocol === "TLSv1") {
+        if (result.protocol.includes("SSL") || result.protocol.includes("v2") || result.protocol.includes("v3")) {
+          const v = protocolVulnerabilities.find(x => x.id === "SSL_V23");
+          foundIssues.push(`[${v.severity}] ${v.name}: ${v.rationale}`);
+          recommendations.push(v.alt);
+          matchedVulnerabilities.push({ id: v.id, category: "PROTOCOL", severity: "CRITICAL", rationale: v.rationale, secureFix: v.alt });
+        } else if (result.protocol.includes("TLSv1.0") || result.protocol === "TLSv1" || result.protocol.includes("TLSv1.1")) {
           const v = protocolVulnerabilities.find(x => x.id === "TLS_10");
           foundIssues.push(`[${v.severity}] ${v.name}: ${v.rationale}`);
           recommendations.push(v.alt);
+          matchedVulnerabilities.push({ id: v.id, category: "PROTOCOL", severity: "HIGH", rationale: v.rationale, secureFix: v.alt });
         }
 
         // ── Cipher suite checks ──
@@ -412,33 +443,52 @@ app.post("/api/audit", async (req, res) => {
 
     // 🔍 MISSION SCORING LOGIC: If no TLS protocols are supported, it's a critical failure.
     if (finalResults.scans.length === 0 || (finalResults.scans.length === 1 && finalResults.scans[0].protocol === 'NONE_DETECTED')) {
-      finalResults.overallStatus = "VULNERABLE";
+      finalResults.overallStatus = "CRITICAL";
       resultScore.score = 0; 
       if (finalResults.scans.length === 0) {
         finalResults.scans.push({
-          protocol: "NONE_DETECTED",
-          cipher: "PLAINTEXT_ONLY",
-          status: "UNSECURE",
-          issues: ["[CRITICAL] No TLS/SSL encryption detected. Data is transmitted in plaintext."],
-          recommendations: ["Immediately implement SSL/TLS (HTTPS) via Port 443."],
+          protocol: "PLAINTEXT_HTTP",
+          cipher: "UNENCRYPTED_CHANNEL",
+          status: "ABSOLUTE_CRITICAL",
+          cipherBits: 0,
+          issues: [
+            "[CRITICAL] NO_TLS_SHAKEHAND: This endpoint failed all secure negotiation attempts.", 
+            "[ABSOLUTE_FAILURE] Broadcasting in Plaintext (HTTP). Data is vulnerable to instant interception.",
+            "[SECURITY_BREACH] No cryptographic layer detected on mission-critical port."
+          ],
+          recommendations: ["DEPLOY SSL/TLS (HTTPS) IMMEDIATELY", "DECOMMISSION PORT 80 ASSETS", "ENFORCE HSTS POLICIES"],
           matchedVulnerabilities: [],
           cert: null,
-          quickSnippet: "CRITICAL: This site is completely unencrypted."
+          quickSnippet: "CRITICAL: This node is broadcasting in plaintext. Execute lockout protocols."
         });
       }
     } else if (resultScore.score === null) {
-      // Internal scoring based on vulnerability severity weights
+      // ── INTERNAL SCORING ENGINE (TACTICAL BIT CONSIDERATION) ──
       const vulnerabilities = finalResults.scans.flatMap(s => s.matchedVulnerabilities);
       let penalty = 0;
+      let worstCipherBits = 256;
+
       vulnerabilities.forEach(v => {
-        if (v.severity === 'CRITICAL') penalty += 25;
-        if (v.severity === 'HIGH') penalty += 15;
+        if (v.severity === 'CRITICAL') penalty += 30;
+        if (v.severity === 'HIGH') penalty += 22; // Increased for TLS 1.0/1.1 visibility
         if (v.severity === 'MEDIUM') penalty += 8;
-        if (v.severity === 'RSA_PENALTY_20') penalty += 20;
-        if (v.severity === 'RSA_PENALTY_10') penalty += 10;
+        if (v.severity === 'RSA_PENALTY_20') penalty += 30; // Sub-1024 bit is now critical
+        if (v.severity === 'RSA_PENALTY_10') penalty += 15; // 1024 bit is now HIGH risk
       });
-      
-      resultScore.score = Math.max(10, 100 - penalty);
+
+      // Bit Consideration: Penalize weak encryption depth
+      finalResults.scans.forEach(s => {
+        if (s.cipherBits > 0 && s.cipherBits < worstCipherBits) worstCipherBits = s.cipherBits;
+      });
+
+      // Calibrated Bit-Depth Penalties (High-Precision Audit)
+      if (worstCipherBits < 128) {
+        penalty += 50; // Legacy / Broken Encryption Depth
+      } else if (worstCipherBits < 256) {
+        penalty += 25; // Sub-standard (128-bit) - downgraded from 'Secure'
+      }
+
+      resultScore.score = Math.max(5, 100 - penalty);
       resultScore.provider = 'INTERNAL_SCANNER';
     }
 
