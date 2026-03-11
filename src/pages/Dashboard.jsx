@@ -235,7 +235,10 @@ function DashboardPage({ user, onLogout }) {
     let safetyScoreLocal;
     let externalScore = auditResults.externalSafety?.score ?? 0;
 
-    if (auditResults.scans.length === 1 && auditResults.scans[0].protocol === 'NONE_DETECTED') {
+    const isCriticalFailure = auditResults.scans.length === 0 || 
+                             (auditResults.scans.length === 1 && auditResults.scans[0].protocol === 'NONE_DETECTED');
+
+    if (isCriticalFailure) {
       safetyScoreLocal = 0;
       safetyScore = 0;
       externalScore = 0;
@@ -260,7 +263,7 @@ function DashboardPage({ user, onLogout }) {
           <div className="url-banner">{auditResults.target}</div>
         </header>
 
-        <div className="safety-grid">
+        <div className="safety-grid" style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
           <div className="safety-score-card">
             <p className="percentage-label">Unified Threat Index</p>
             <h2 className="percentage-value" style={{ color: statusObj.color }}>{safetyScore}%</h2>
@@ -301,13 +304,23 @@ function DashboardPage({ user, onLogout }) {
             )}
           </div>
 
-          <div className="safety-score-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+          <div className="safety-score-card" style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            textAlign: 'center',
+            width: '100%',
+            maxWidth: '1000px',
+            margin: '0 auto'
+          }}>
             <p className="percentage-label">Visual Threat Vector</p>
             <div className="chart-container" style={{ 
-              marginTop: '1.5rem', 
+              marginTop: '2rem', 
               display: 'flex', 
               flexDirection: 'column', 
               alignItems: 'center', 
+              justifyContent: 'center',
               width: '100%' 
             }}>
               <svg viewBox="0 0 110 110" className="circular-chart" style={{ width: '220px', height: '220px' }}>
@@ -320,20 +333,23 @@ function DashboardPage({ user, onLogout }) {
                 <circle className="circle" cx="55" cy="55" r="38" style={{ strokeDasharray: strokeDasharrayExternal, stroke: '#51afef', strokeWidth: '3.5', opacity: '0.8' }}></circle>
               </svg>
               
-              <div style={{ 
+              <div className="chart-legend" style={{ 
                 display: 'flex', 
-                gap: '1.5rem', 
-                marginTop: '1.5rem', 
-                fontSize: '0.7rem', 
-                opacity: 0.8,
-                letterSpacing: '0.1em',
-                fontWeight: 'bold'
+                gap: '2.5rem', 
+                marginTop: '2.5rem', 
+                fontSize: '0.75rem', 
+                opacity: 0.9,
+                letterSpacing: '0.15em',
+                fontWeight: '900',
+                fontFamily: 'var(--font-mono)',
+                justifyContent: 'center',
+                width: '100%'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: statusObj.color }}></div> UNIFIED
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: statusObj.color, boxShadow: `0 0 10px ${statusObj.color}40` }}></div> UNIFIED
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#51afef' }}></div> EXTERNAL
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#51afef', boxShadow: '0 0 10px rgba(81, 175, 239, 0.4)' }}></div> EXTERNAL
                 </div>
               </div>
             </div>
