@@ -125,6 +125,7 @@ function LoginPage({ onLoginSuccess }) {
                 <div className="input-wrapper">
                   <Cpu className="input-icon" size={18} />
                   <input 
+                    name="node_operator_name"
                     type="text" 
                     className="input" 
                     placeholder="System Admin / Lead Dev"
@@ -141,13 +142,14 @@ function LoginPage({ onLoginSuccess }) {
                 <div className="input-wrapper">
                   <Mail className="input-icon" size={18} />
                   <input 
+                    name="node_operator_email"
                     type="email" 
                     className="input" 
                     placeholder="admin@tls-auditor.sys"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    autoComplete="off"
+                    autoComplete="no-autofill-email"
                   />
                 </div>
               </div>
@@ -159,13 +161,14 @@ function LoginPage({ onLoginSuccess }) {
             <div className="input-wrapper">
               <Phone className="input-icon" size={18} />
               <input 
+                name="node_operator_phone"
                 type="tel" 
                 className="input" 
                 placeholder="+91 98765 43210"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
-                autoComplete="off"
+                autoComplete="new-operator-contact"
               />
             </div>
           </div>
@@ -175,6 +178,7 @@ function LoginPage({ onLoginSuccess }) {
             <div className="input-wrapper">
               <Lock className="input-icon" size={18} />
               <input 
+                name="node_operator_token"
                 type="password" 
                 className="input" 
                 placeholder="••••••••••••"
