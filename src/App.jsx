@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Phone, 
@@ -14,13 +14,38 @@ import { supabase } from './supabase';
 import Dashboard from './Dashboard';
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return localStorage.getItem('tls_session_active') === 'true';
+  });
   const [isLogin, setIsLogin] = useState(true);
   const [phone, setPhone] = useState('1');
   const [password, setPassword] = useState('1');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    // Check for existing Supabase session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setIsLoggedIn(true);
+        localStorage.setItem('tls_session_active', 'true');
+      }
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setIsLoggedIn(true);
+        localStorage.setItem('tls_session_active', 'true');
+      } else {
+        setIsLoggedIn(false);
+        localStorage.removeItem('tls_session_active');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,6 +57,7 @@ function App() {
       setTimeout(() => {
         setLoading(false);
         setIsLoggedIn(true);
+        localStorage.setItem('tls_session_active', 'true');
       }, 1000);
       return;
     }
@@ -44,6 +70,7 @@ function App() {
         });
         if (error) throw error;
         setIsLoggedIn(true);
+        localStorage.setItem('tls_session_active', 'true');
       } else {
         const { error } = await supabase.auth.signUp({
           phone,
@@ -65,8 +92,14 @@ function App() {
     }
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setIsLoggedIn(false);
+    localStorage.removeItem('tls_session_active');
+  };
+
   if (isLoggedIn) {
-    return <Dashboard onLogout={() => setIsLoggedIn(false)} />;
+    return <Dashboard onLogout={handleLogout} />;
   }
 
   return (
@@ -187,19 +220,6 @@ function App() {
             )}
           </button>
         </form>
-
-        <div className="divider">
-          <span>External Auth Systems</span>
-        </div>
-
-        <div className="social-login">
-          <button className="social-btn">
-            <Chrome size={18} /> Google
-          </button>
-          <button className="social-btn">
-            <Github size={18} /> GitHub
-          </button>
-        </div>
 
         <p className="footer-text">
           {isLogin ? (

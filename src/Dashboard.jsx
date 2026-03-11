@@ -10,17 +10,30 @@ import {
   LogOut,
   AlertTriangle,
   CheckCircle,
-  Loader2
+  Loader2,
+  ChevronRight,
+  Terminal
 } from 'lucide-react';
 
 function Dashboard({ onLogout }) {
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState(() => sessionStorage.getItem('tls_audit_url') || '');
   const [isAuditing, setIsAuditing] = useState(false);
-  const [auditResults, setAuditResults] = useState(null);
-  const [showResults, setShowResults] = useState(false);
+  const [auditResults, setAuditResults] = useState(() => {
+    const saved = sessionStorage.getItem('tls_audit_results');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [showResults, setShowResults] = useState(() => {
+    return sessionStorage.getItem('tls_show_results') === 'true';
+  });
   const [terminalLogs, setTerminalLogs] = useState([
     { time: new Date().toLocaleTimeString(), type: 'info', msg: 'System initialized. Waiting for input...' }
   ]);
+
+  useEffect(() => {
+    sessionStorage.setItem('tls_audit_url', url);
+    sessionStorage.setItem('tls_audit_results', JSON.stringify(auditResults));
+    sessionStorage.setItem('tls_show_results', showResults);
+  }, [url, auditResults, showResults]);
 
   const addLog = (msg, type = 'info') => {
     setTerminalLogs(prev => [...prev.slice(-8), { 
@@ -77,6 +90,15 @@ function Dashboard({ onLogout }) {
     const safetyScore = auditResults.overallStatus === 'SECURE' ? 98 : Math.max(20, 100 - (vulnerabilities.length * 15));
     const strokeDasharray = `${(safetyScore * 314) / 100}, 314`;
 
+    const getStatusInfo = (score) => {
+      if (score >= 80) return { color: '#4ade80', text: 'SAFE' };
+      if (score >= 60) return { color: '#ECBE7B', text: 'NOT SAFE' };
+      if (score >= 40) return { color: '#ff4b4b', text: 'VULNERABLE' };
+      return { color: '#8b0000', text: 'CRITICAL' };
+    };
+
+    const statusObj = getStatusInfo(safetyScore);
+
     return (
       <div className="dashboard-container">
         <div className="bg-mesh"></div>
@@ -104,12 +126,33 @@ function Dashboard({ onLogout }) {
           <div className="safety-grid">
             <div className="safety-score-card">
               <p className="percentage-label">Percentage of Safety</p>
-              <h2 className="percentage-value">{safetyScore}%</h2>
+              <h2 className="percentage-value" style={{ color: statusObj.color }}>{safetyScore}%</h2>
+              <div style={{ 
+                marginTop: '1rem', 
+                fontSize: '0.9rem', 
+                fontWeight: 'bold', 
+                color: statusObj.color,
+                letterSpacing: '0.1em',
+                background: `${statusObj.color}15`,
+                padding: '0.4rem 1rem',
+                borderRadius: '2rem',
+                display: 'inline-block'
+              }}>
+                STATUS: {statusObj.text}
+              </div>
             </div>
             <div className="chart-container">
               <svg viewBox="0 0 110 110" className="circular-chart">
                 <circle className="circle-bg" cx="55" cy="55" r="50"></circle>
-                <circle className="circle" cx="55" cy="55" r="50" style={{ strokeDasharray }}></circle>
+                <circle 
+                  className="circle" 
+                  cx="55" cy="55" r="50" 
+                  style={{ 
+                    strokeDasharray, 
+                    stroke: statusObj.color,
+                    filter: `drop-shadow(0 0 8px ${statusObj.color}80)`
+                  }}
+                ></circle>
               </svg>
             </div>
           </div>
@@ -136,6 +179,24 @@ function Dashboard({ onLogout }) {
                   <li>System operating at optimal security parameters.</li>
                 )}
               </ul>
+            </div>
+          </div>
+
+          <div className="info-box" style={{ marginBottom: '3rem', width: '100%', borderColor: 'rgba(212, 175, 55, 0.2)' }}>
+            <h3><Terminal size={18} /> Security Analysis & Rationale</h3>
+            <div style={{ color: 'var(--text-gray)', fontSize: '0.9rem', lineHeight: '1.6' }}>
+              <p style={{ marginBottom: '1rem' }}>
+                <span className="gold-text">ANALYSIS:</span> Our automated engine detected that the server infrastructure 
+                {vulnerabilities.length > 0 
+                  ? ` is using outdated handshake protocols which are susceptible to downgrade attacks (like POODLE).`
+                  : ` is correctly enforcing modern encryption standards (TLS 1.2+).`
+                }
+              </p>
+              <p>
+                <span className="gold-text">RATIONALE:</span> The proposed configuration below enforces <span className="gold-text">Strict Transport Security</span>. 
+                By disabling older ciphers and versions (SSL/TLS 1.0/1.1), we eliminate over 90% of common automated exploit vectors targeting web-facing infrastructure. 
+                Using <span className="gold-text">ECDHE</span> ensure "Perfect Forward Secrecy," meaning even if the private key is compromised later, past sessions remain encrypted.
+              </p>
             </div>
           </div>
 

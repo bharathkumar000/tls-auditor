@@ -627,15 +627,16 @@ body {
 .circle-bg {
   fill: none;
   stroke: rgba(255, 255, 255, 0.05);
-  stroke-width: 2;
+  stroke-width: 6;
 }
 
 .circle {
   fill: none;
   stroke: var(--gold-primary);
-  stroke-width: 3;
+  stroke-width: 6;
   stroke-linecap: round;
   transition: stroke-dasharray 1s ease-out;
+  filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.5));
 }
 
 .dual-info-grid {
