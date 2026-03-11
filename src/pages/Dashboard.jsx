@@ -163,8 +163,8 @@ function DashboardPage({ user, onLogout }) {
       </header>
 
       <div className="upload-container">
-        <form onSubmit={handleAudit} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '1.5rem' }}>
-          <div style={{ position: 'relative', flex: 1 }}>
+        <form onSubmit={handleAudit} style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '1.25rem' }}>
+          <div style={{ position: 'relative', width: '100%' }}>
             <Search className="search-icon" size={20} />
             <input 
               type="text" 
@@ -172,9 +172,10 @@ function DashboardPage({ user, onLogout }) {
               className="dash-input"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
+              style={{ width: '100%' }}
             />
           </div>
-          <button className="run-btn" disabled={isAuditing} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button className="run-btn" disabled={isAuditing} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', width: 'fit-content', padding: '0.8rem 2rem' }}>
             {isAuditing ? <Loader2 className="animate-spin" size={18} /> : <><Shield size={18} /> RUN_AUDIT</>}
           </button>
         </form>

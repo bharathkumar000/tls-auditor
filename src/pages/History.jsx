@@ -36,6 +36,13 @@ function HistoryPage({ user, onReAudit }) {
       </header>
 
         <div className="vuln-table-container">
+          {error && (
+            <div style={{ padding: '2rem', background: 'rgba(255, 0, 0, 0.1)', border: '1px solid rgba(255, 0, 0, 0.2)', borderRadius: '0.75rem', marginBottom: '2rem', color: '#ff6b6b', textAlign: 'center' }}>
+              <Terminal size={20} style={{ margin: '0 auto 0.5rem', display: 'block' }} />
+              <strong>SYSTEM_FETCH_ERROR:</strong> {error}
+            </div>
+          )}
+          
           {loading ? (
             <div style={{ padding: '5rem', textAlign: 'center' }}>
               <Loader2 className="animate-spin" size={40} style={{ color: 'var(--gold-primary)', margin: '0 auto' }} />
