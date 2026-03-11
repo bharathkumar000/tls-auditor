@@ -2,7 +2,7 @@
 ### **High-Fidelity Automated Infrastructure Scanning & Threat Intelligence**
 
 ![TLS_AUDITOR_BANNER](https://img.shields.io/badge/SECURITY-MISSION_CRITICAL-gold?style=for-the-badge&logo=shield)
-![VERSION](https://img.shields.io/badge/VERSION-1.2.0-blue?style=for-the-badge)
+![VERSION](https://img.shields.io/badge/VERSION-1.3.0-blue?style=for-the-badge)
 ![LICENSE](https://img.shields.io/badge/LICENSE-MIT-green?style=for-the-badge)
 
 **TLS AUDITOR** is a high-performance, developer-centric security engine designed to audit SSL/TLS configurations, detect cryptographic vulnerabilities, and provide a unified safety score based on internal scans and global threat intelligence.
@@ -53,7 +53,7 @@ Create a `.env` file in the root directory:
 CRYPT_CHECK_API=https://cryptcheck.fr/api/v1/host/
 VITE_SUPABASE_URL=YOUR_SUPABASE_URL
 VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_KEY
-PORT=3000
+PORT=9090
 ```
 
 ### 3️⃣ INSTALLATION
@@ -66,7 +66,7 @@ Launch the unified security console with a single command:
 ```bash
 npm run dev
 ```
-Navigate to **`http://localhost:3000`** to begin auditing.
+Navigate to **`http://localhost:9090`** to begin auditing.
 
 ---
 
