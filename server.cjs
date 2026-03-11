@@ -454,7 +454,7 @@ app.post("/api/audit", async (req, res) => {
 });
 
 // 🧪 INTEGRATED VITE ENGINE (THE MERGE CATCH-ALL)
-async function setupVite() {
+async function startServer() {
   if (!isProd) {
     const { createServer: createViteServer } = require('vite');
     const vite = await createViteServer({
@@ -463,7 +463,7 @@ async function setupVite() {
     });
     app.use(vite.middlewares);
     
-    app.get('*all', async (req, res, next) => {
+    app.get(/.*/, async (req, res, next) => {
       if (req.path.startsWith('/api')) return next();
       try {
         const fs = require('fs');
@@ -477,16 +477,17 @@ async function setupVite() {
   } else {
     const staticPath = path.join(__dirname, "dist");
     app.use(express.static(staticPath));
-    app.get('*all', (req, res) => {
+    app.get(/.*/, (req, res) => {
       res.sendFile(path.join(staticPath, "index.html"));
     });
   }
-}
-setupVite();
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 [FULL_FUSION_ACTIVE] Auditor Engine & Terminal UI Merged.`);
-  console.log(`📡 Scan Node Running: http://localhost:${PORT}\n`);
-});
+  app.listen(PORT, () => {
+    console.log(`\n🚀 [FULL_FUSION_ACTIVE] Auditor Engine & Terminal UI Merged.`);
+    console.log(`📡 Scan Node Running: http://localhost:${PORT}\n`);
+  });
+}
+
+startServer();
 
 
