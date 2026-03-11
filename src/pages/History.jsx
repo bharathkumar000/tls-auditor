@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Globe, 
   History as HistoryIcon, 
-  Loader2 
+  Loader2,
+  Terminal 
 } from 'lucide-react';
 import { getAssetInventory } from '../services/auditService';
 
