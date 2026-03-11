@@ -485,6 +485,8 @@ async function setupVite() {
 setupVite();
 
 app.listen(PORT, () => {
-  console.log(`Auditor Engine running on http://localhost:${PORT}`);
+  console.log(`\n🚀 [FULL_FUSION_ACTIVE] Auditor Engine & Terminal UI Merged.`);
+  console.log(`📡 Scan Node Running: http://localhost:${PORT}\n`);
 });
+
 
