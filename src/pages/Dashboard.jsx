@@ -19,7 +19,9 @@ import {
 import { runAudit, saveAuditLog, isDomainRegistered } from '../services/auditService';
 
 function DashboardPage({ user, onLogout }) {
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState(() => {
+    return sessionStorage.getItem('tls_audit_url') || '';
+  });
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditResults, setAuditResults] = useState(() => {
     const saved = sessionStorage.getItem('tls_audit_results');
@@ -34,6 +36,7 @@ function DashboardPage({ user, onLogout }) {
   ]);
   const [showReportButton, setShowReportButton] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [urlError, setUrlError] = useState(null);
 
   useEffect(() => {
     sessionStorage.setItem('tls_audit_url', url);
@@ -83,7 +86,12 @@ function DashboardPage({ user, onLogout }) {
       
     } catch (err) {
       addLog(`AUDIT_FAILED: ${err.message}`, 'error');
-      alert(`Connection Error: ${err.message}`);
+      // Tactical Error Intercept
+      if (err.message.includes('getaddrinfo') || err.message.includes('ETIMEDOUT') || err.message.includes('ECONNREFUSED')) {
+        setUrlError(`MISSION_CRITICAL: URL NOT FOUND. [${url}] is not globally deployed or has been decommissioned.`);
+      } else {
+        alert(`Connection Error: ${err.message}`);
+      }
     } finally {
       setIsAuditing(false);
     }
@@ -101,10 +109,17 @@ function DashboardPage({ user, onLogout }) {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const W = doc.internal.pageSize.getWidth();
     const vulnerabilities = auditResults.scans.flatMap(s => s.issues);
+    const isPlaintext = auditResults.scans.some(s => s.protocol === 'PLAINTEXT_HTTP');
     let safetyScoreLocal = auditResults.overallStatus === 'SECURE' ? 95 : Math.max(10, 100 - (vulnerabilities.length * 20));
-    const extScore = auditResults.externalSafety?.score ?? safetyScoreLocal;
+    let extScore = auditResults.externalSafety?.score ?? safetyScoreLocal;
+    
+    if (isPlaintext || auditResults.overallStatus === 'CRITICAL') {
+      safetyScoreLocal = 0;
+      extScore = 0;
+    }
+
     const unified = Math.round((safetyScoreLocal * 0.4) + (extScore * 0.6));
-    const statusLabel = unified >= 85 ? 'SAFE' : unified >= 60 ? 'NOT SAFE' : 'VULNERABLE';
+    const statusLabel = unified >= 80 ? 'SAFE' : unified >= 60 ? 'NOT SAFE' : unified >= 40 ? 'VULNERABLE' : 'CRITICAL';
     const ts = new Date().toLocaleString();
 
     // ── Background ──
@@ -265,10 +280,12 @@ function DashboardPage({ user, onLogout }) {
     let safetyScoreLocal;
     let externalScore = auditResults.externalSafety?.score ?? 0;
 
+    const isPlaintext = auditResults.scans.some(s => s.protocol === 'PLAINTEXT_HTTP');
     const isCriticalFailure = auditResults.scans.length === 0 || 
-                             (auditResults.scans.length === 1 && auditResults.scans[0].protocol === 'NONE_DETECTED');
+                             (auditResults.scans.length === 1 && auditResults.scans[0].protocol === 'NONE_DETECTED') ||
+                             isPlaintext;
 
-    if (isCriticalFailure) {
+    if (isCriticalFailure || auditResults.overallStatus === 'CRITICAL') {
       safetyScoreLocal = 0;
       safetyScore = 0;
       externalScore = 0;
@@ -440,7 +457,135 @@ function DashboardPage({ user, onLogout }) {
           </button>
         </div>
       </main>
-    );
+
+      {/* ── MISSION_ERROR_POPUP ── */}
+      <AnimatePresence>
+        {urlError && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="modal-overlay"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="error-popup-card"
+            >
+              <div className="popup-header">
+                <AlertTriangle className="error-icon" size={24} />
+                <h3>SECURE_NODE_ERROR</h3>
+                <button className="close-popup" onClick={() => setUrlError(null)}>
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="popup-body">
+                <p className="error-code">ERROR_CODE: 404_DEPLOYMENT_NOT_FOUND</p>
+                <p className="error-msg">{urlError}</p>
+                <div className="popup-action">
+                  <button className="remedy-btn" onClick={() => { setUrlError(null); setUrl(''); }}>
+                    CLEAR_ENDPOINT_CACHE
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <style jsx>{`
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.85);
+          backdrop-filter: blur(8px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+          padding: 2rem;
+        }
+        .error-popup-card {
+          background: #121212;
+          border: 1px solid #ff4b4b;
+          border-radius: 12px;
+          width: 100%;
+          max-width: 480px;
+          box-shadow: 0 0 50px rgba(255, 75, 75, 0.2);
+          overflow: hidden;
+        }
+        .popup-header {
+          background: rgba(255, 75, 75, 0.1);
+          padding: 1.25rem 1.5rem;
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          border-bottom: 1px solid rgba(255, 75, 75, 0.2);
+        }
+        .popup-header h3 {
+          font-family: var(--font-mono);
+          margin: 0;
+          font-size: 1rem;
+          letter-spacing: 0.1em;
+          color: #ff4b4b;
+          font-weight: 800;
+        }
+        .error-icon {
+          color: #ff4b4b;
+        }
+        .close-popup {
+          margin-left: auto;
+          background: transparent;
+          border: none;
+          color: var(--text-gray);
+          cursor: pointer;
+          transition: 0.2s;
+        }
+        .close-popup:hover {
+          color: white;
+          transform: scale(1.1);
+        }
+        .popup-body {
+          padding: 2rem 1.5rem;
+        }
+        .error-code {
+          font-family: var(--font-mono);
+          font-size: 0.7rem;
+          color: var(--text-gray);
+          margin-bottom: 0.5rem;
+          opacity: 0.6;
+        }
+        .error-msg {
+          color: white;
+          font-size: 0.95rem;
+          line-height: 1.6;
+          margin-bottom: 2rem;
+          font-weight: 500;
+        }
+        .remedy-btn {
+          width: 100%;
+          background: #ff4b4b;
+          color: white;
+          border: none;
+          padding: 1rem;
+          border-radius: 8px;
+          font-family: var(--font-mono);
+          font-weight: 900;
+          letter-spacing: 0.1em;
+          cursor: pointer;
+          transition: 0.3s;
+        }
+        .remedy-btn:hover {
+          background: #ff3333;
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(255, 75, 75, 0.3);
+        }
+      `}</style>
+    </main>
   }
 
   return (
@@ -468,18 +613,20 @@ function DashboardPage({ user, onLogout }) {
 
       <div className="upload-container">
         <form onSubmit={handleAudit} style={{ width: '100%' }}>
-          <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
-            <Search className="search-icon" size={20} />
-            <input 
-              type="text" 
-              placeholder="SYSTEM_ENDPOINT_URL (e.g., google.com)" 
-              className="dash-input"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              style={{ width: '100%', paddingRight: '10rem' }}
-              autoComplete="off"
-            />
-            <button className="run-btn" disabled={isAuditing}>
+          <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Search className="search-icon" size={20} />
+              <input 
+                type="text" 
+                placeholder="SYSTEM_ENDPOINT_URL (e.g., google.com)" 
+                className="dash-input"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                style={{ width: '100%' }}
+                autoComplete="off"
+              />
+            </div>
+            <button className="run-btn" disabled={isAuditing} style={{ position: 'relative', right: '0', top: '0', height: '48px', minWidth: '140px' }}>
               {isAuditing ? <Loader2 className="animate-spin" size={16} /> : 'RUN_AUDIT'}
             </button>
           </div>

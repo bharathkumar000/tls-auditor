@@ -87,15 +87,6 @@ function RecordsPage({ user, onReAudit }) {
                   <div key={i} className="record-card registered-node">
                     <div className="record-main">
                       <div className="record-url">{domain.url}</div>
-                      <div className="record-meta">
-                        <span style={{ color: getStatusColor(domain.score) }} className="status-tag">
-                           {domain.status}
-                        </span>
-                        <span className="dot">•</span>
-                        <span>{domain.score}%</span>
-                        <span className="dot">•</span>
-                        <span>{new Date(domain.created_at).toLocaleDateString()}</span>
-                      </div>
                     </div>
                     <button className="audit-mini-btn" onClick={() => onReAudit(domain.url)}>
                       <Zap size={14} />
