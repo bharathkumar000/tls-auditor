@@ -62,15 +62,11 @@ npm install
 ```
 
 ### 4️⃣ RUNNING THE ENGINE
-For a live development session with Hot Module Replacement (HMR):
+Launch the unified security console with a single command:
 ```bash
-# Terminal 1: Launch Backend Logic
-npm run server
-
-# Terminal 2: Launch Frontend UI
 npm run dev
 ```
-Navigate to **`http://localhost:5174`** to begin auditing.
+Navigate to **`http://localhost:3000`** to begin auditing.
 
 ---
 
