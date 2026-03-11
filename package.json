@@ -4,12 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm run server\" \"vite --port 5174\"",
     "server": "node server.cjs",
-    "start": "concurrently \"npm run server\" \"npm run dev\"",
     "build": "vite build",
+    "start": "npm run build && npm run server",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview --port 5174"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.1",

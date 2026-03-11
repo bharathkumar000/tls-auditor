@@ -48,7 +48,7 @@ function Dashboard({ onLogout }) {
   // Fetch vulnerability database when switching to vulndb view
   useEffect(() => {
     if (activeView === 'vulndb' && !vulnData) {
-      fetch('http://localhost:3001/api/vulnerabilities')
+      fetch('/api/vulnerabilities')
         .then(res => res.json())
         .then(data => setVulnData(data))
         .catch(err => console.error('Failed to fetch vuln DB:', err));
@@ -73,7 +73,7 @@ function Dashboard({ onLogout }) {
     addLog(`Initializing audit for: ${url}`, 'info');
     
     try {
-      const response = await fetch('http://localhost:3001/api/audit', {
+      const response = await fetch('/api/audit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url })
@@ -123,31 +123,38 @@ function Dashboard({ onLogout }) {
   };
 
   // ═══════════════════════════════════════════════════════
-  // SIDEBAR (Shared across all views)
+  // TOP NAVIGATION BAR (Header)
   // ═══════════════════════════════════════════════════════
-  const Sidebar = () => (
-    <nav className="side-nav">
-      <div className="nav-brand"><Zap className="gold-text" size={24} /></div>
-      <div className="nav-links">
+  const TopNav = () => (
+    <nav className="top-nav">
+      <div className="nav-left">
+        <div className="nav-brand"><Zap className="gold-text" size={24} /></div>
+        <span className="brand-text">TLS_AUDITOR</span>
+      </div>
+      
+      <div className="nav-center">
         <button 
           className={`nav-btn ${activeView === 'dashboard' ? 'active' : ''}`}
           onClick={() => { setActiveView('dashboard'); setShowResults(false); }}
-          title="Dashboard"
         >
-          <LayoutDashboard size={20} />
+          <LayoutDashboard size={20} /> <span>DASHBOARD</span>
         </button>
         <button 
           className={`nav-btn ${activeView === 'vulndb' ? 'active' : ''}`}
           onClick={() => setActiveView('vulndb')}
-          title="Vulnerability Database"
         >
-          <Database size={20} />
+          <Database size={20} /> <span>DATABASE</span>
         </button>
-        <button className="nav-btn" title="Network">
-          <Globe size={20} />
+        <button className="nav-btn">
+          <Globe size={20} /> <span>NETWORK</span>
         </button>
       </div>
-      <button className="logout-btn" onClick={onLogout}><LogOut size={20} /></button>
+
+      <div className="nav-right">
+        <button className="logout-btn" onClick={onLogout}>
+          <LogOut size={20} /> <span className="hide-mobile">SIGNOUT</span>
+        </button>
+      </div>
     </nav>
   );
 
@@ -172,7 +179,7 @@ function Dashboard({ onLogout }) {
       <div className="dashboard-container">
         <div className="bg-mesh"></div>
         <div className="bg-grid"></div>
-        <Sidebar />
+        <TopNav />
 
         <main className="main-content results-view">
           <header className="results-header" style={{ marginBottom: '1.5rem' }}>
@@ -370,7 +377,7 @@ function Dashboard({ onLogout }) {
       <div className="dashboard-container">
         <div className="bg-mesh"></div>
         <div className="bg-grid"></div>
-        <Sidebar />
+        <TopNav />
 
         <main className="main-content results-view">
           <button className="back-btn" onClick={() => setShowResults(false)}>
@@ -595,7 +602,7 @@ function Dashboard({ onLogout }) {
     <div className="dashboard-container">
       <div className="bg-mesh"></div>
       <div className="bg-grid"></div>
-      <Sidebar />
+      <TopNav />
 
       <main className="main-content">
         <header className="dash-header">

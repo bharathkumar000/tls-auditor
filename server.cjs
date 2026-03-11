@@ -4,10 +4,18 @@ const cors = require("cors");
 const tls = require("tls");
 
 const app = express();
-const PORT = 3001;
+const PORT = 3000;
+const path = require("path");
 
 app.use(cors());
 app.use(express.json());
+
+const staticPath = path.join(__dirname, "dist");
+app.use(express.static(staticPath));
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(staticPath, "index.html"));
+});
 
 // ═══════════════════════════════════════════════════════════════════
 // EXTERNAL API CONFIGURATION
@@ -180,23 +188,29 @@ async function testProtocol(host, protocol) {
         const usedProtocol = socket.getProtocol();
         const cert = socket.getPeerCertificate();
 
+        const safeCert = {
+          issuer: cert.issuer?.CN || 'Unknown',
+          validFrom: cert.valid_from,
+          validTo: cert.valid_to,
+          subject: cert.subject?.CN || 'Unknown',
+          bits: cert.bits || 0,
+          pubkey: cert.pubkey ? cert.pubkey.toString('hex').substring(0, 100) + "..." : null,
+          sigAlgorithm: cert.sig_alg || cert.sigalg || 'Unknown'
+        };
+
         resolve({
           protocol: usedProtocol,
-          cipher: cipher.name,
-          cert: {
-            issuer: cert.issuer?.CN || 'Unknown',
-            validFrom: cert.valid_from,
-            validTo: cert.valid_to,
-            subject: cert.subject?.CN || 'Unknown',
-            bits: cert.bits || 0,
-            pubkey: cert.pubkey ? cert.pubkey.toString('hex') : null,
-            sigAlgorithm: cert.sigalg || 'Unknown'
-          }
+          cipher: cipher?.name || 'Unknown',
+          cert: safeCert
         });
         socket.end();
       });
 
-      socket.on("error", () => resolve(null));
+      socket.on("error", (err) => {
+        console.log(`[TEST_FAIL] ${protocol} on ${host}: ${err.message}`);
+        resolve(null);
+      });
+      
       socket.on("timeout", () => {
         socket.destroy();
         resolve(null);
@@ -280,94 +294,101 @@ app.post("/api/audit", async (req, res) => {
   if (!url) return res.status(400).json({ error: "URL is required" });
 
   const host = url.replace("https://", "").replace("http://", "").split('/')[0];
-  const testableProtocols = ["TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"];
-  
-  // Start external safety rating check & CryptCheck in parallel
-  const externalSafetyPromise = fetchExternalSafetyRating(host);
-  const cryptCheckPromise = fetchCryptCheckData(host);
+  console.log(`[AUDIT_INIT] Target: ${host}`);
 
-  const finalResults = {
-    target: host,
-    timestamp: new Date().toISOString(),
-    scans: [],
-    overallStatus: "SECURE",
-    badCipherDatabase: badCipherSuites,
-    cryptCheck: null
-  };
+  try {
+    const testableProtocols = ["TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"];
+    
+    // Start external safety rating check & CryptCheck in parallel
+    const externalSafetyPromise = fetchExternalSafetyRating(host);
+    const cryptCheckPromise = fetchCryptCheckData(host);
 
-  for (const proto of testableProtocols) {
-    const result = await testProtocol(host, proto);
-    if (result) {
-      const foundIssues = [];
-      const recommendations = [];
-      const matchedVulnerabilities = [];
-      
-      // Secondary Rule Engine check (Stretch goal requirement)
-      const quickSnippet = getSuggestion(result.cipher);
+    const finalResults = {
+      target: host,
+      timestamp: new Date().toISOString(),
+      scans: [],
+      overallStatus: "SECURE",
+      badCipherDatabase: badCipherSuites,
+      cryptCheck: null
+    };
 
-      // ── Protocol checks ──
-      if (result.protocol.includes("TLSv1.0") || result.protocol === "TLSv1") {
-        const v = protocolVulnerabilities.find(x => x.id === "TLS_10");
-        foundIssues.push(`[${v.severity}] ${v.name}: ${v.rationale}`);
-        recommendations.push(v.alt);
-      }
+    for (const proto of testableProtocols) {
+      const result = await testProtocol(host, proto);
+      if (result) {
+        const foundIssues = [];
+        const recommendations = [];
+        const matchedVulnerabilities = [];
+        
+        const quickSnippet = getSuggestion(result.cipher);
 
-      // ── Cipher suite checks (against all 30 bad ciphers) ──
-      const cipherMatches = matchCipherVulnerabilities(result.cipher);
-      for (const match of cipherMatches) {
-        const label = match.cipherName || match.category;
-        foundIssues.push(`[${match.severity}] ${match.category}: ${label} — ${match.rationale}`);
-        recommendations.push(match.secureFix);
-        matchedVulnerabilities.push({
-          id: match.id,
-          cipherName: match.cipherName || result.cipher,
-          category: match.category,
-          severity: match.severity,
-          secureFix: match.secureFix
+        // ── Protocol checks ──
+        if (result.protocol.includes("TLSv1.0") || result.protocol === "TLSv1") {
+          const v = protocolVulnerabilities.find(x => x.id === "TLS_10");
+          foundIssues.push(`[${v.severity}] ${v.name}: ${v.rationale}`);
+          recommendations.push(v.alt);
+        }
+
+        // ── Cipher suite checks ──
+        const cipherMatches = matchCipherVulnerabilities(result.cipher);
+        for (const match of cipherMatches) {
+          const label = match.cipherName || match.category;
+          foundIssues.push(`[${match.severity}] ${match.category}: ${label} — ${match.rationale}`);
+          recommendations.push(match.secureFix);
+          matchedVulnerabilities.push({
+            id: match.id,
+            cipherName: match.cipherName || result.cipher,
+            category: match.category,
+            severity: match.severity,
+            secureFix: match.secureFix
+          });
+        }
+
+        // ── Certificate checks ──
+        if (result.cert.bits > 0 && result.cert.bits < 2048) {
+          const v = certVulnerabilities.find(x => x.id === "SMALL_RSA");
+          foundIssues.push(`[${v.severity}] ${v.name} (${result.cert.bits} bits): ${v.rationale}`);
+          recommendations.push(v.alt);
+        }
+
+        if (result.cert.sigAlgorithm && result.cert.sigAlgorithm.toLowerCase().includes('sha1')) {
+          const v = certVulnerabilities.find(x => x.id === "SHA1_CERT");
+          foundIssues.push(`[${v.severity}] ${v.name}: ${v.rationale}`);
+          recommendations.push(v.alt);
+        }
+
+        if (foundIssues.length > 0) finalResults.overallStatus = "VULNERABLE";
+
+        finalResults.scans.push({
+          protocol: result.protocol,
+          cipher: result.cipher,
+          issues: foundIssues,
+          cert: result.cert,
+          recommendations: [...new Set(recommendations)],
+          matchedVulnerabilities,
+          quickSnippet 
         });
       }
-
-      // ── Certificate checks ──
-      if (result.cert.bits > 0 && result.cert.bits < 2048) {
-        const v = certVulnerabilities.find(x => x.id === "SMALL_RSA");
-        foundIssues.push(`[${v.severity}] ${v.name} (${result.cert.bits} bits): ${v.rationale}`);
-        recommendations.push(v.alt);
-      }
-
-      if (result.cert.sigAlgorithm && result.cert.sigAlgorithm.toLowerCase().includes('sha1')) {
-        const v = certVulnerabilities.find(x => x.id === "SHA1_CERT");
-        foundIssues.push(`[${v.severity}] ${v.name}: ${v.rationale}`);
-        recommendations.push(v.alt);
-      }
-
-      if (foundIssues.length > 0) finalResults.overallStatus = "VULNERABLE";
-
-      finalResults.scans.push({
-        protocol: result.protocol,
-        cipher: result.cipher,
-        issues: foundIssues,
-        cert: result.cert,
-        recommendations: [...new Set(recommendations)],
-        matchedVulnerabilities,
-        quickSnippet // Injected from rule engine
-      });
     }
-  }
 
-  // Finalize third-party data
-  const externalSafety = await externalSafetyPromise;
-  const cryptCheck = await cryptCheckPromise;
-  
-  if (externalSafety.provider === 'SIMULATED') {
-    // Generate simulated score based on internal audit results
-    const vulnerabilities = finalResults.scans.flatMap(s => s.issues);
-    const score = Math.max(15, 100 - (vulnerabilities.length * 12));
-    externalSafety.score = score;
-  }
+    // Finalize third-party data
+    const externalSafety = await externalSafetyPromise;
+    const cryptCheck = await cryptCheckPromise;
+    
+    if (externalSafety.provider === 'SIMULATED') {
+      const vulnerabilities = finalResults.scans.flatMap(s => s.issues);
+      const score = Math.max(15, 100 - (vulnerabilities.length * 12));
+      externalSafety.score = score;
+    }
 
-  finalResults.externalSafety = externalSafety;
-  finalResults.cryptCheck = cryptCheck;
-  res.json(finalResults);
+    finalResults.externalSafety = externalSafety;
+    finalResults.cryptCheck = cryptCheck;
+    
+    console.log(`[AUDIT_SUCCESS] ${host} - Scans: ${finalResults.scans.length}`);
+    res.json(finalResults);
+  } catch (err) {
+    console.error(`[AUDIT_FATAL] Error auditing ${host}:`, err.message);
+    res.status(500).json({ error: "Internal Audit Engine Error", message: err.message });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -385,6 +406,11 @@ app.get("/api/vulnerabilities", (req, res) => {
     },
     categories: [...new Set(badCipherSuites.map(c => c.category))]
   });
+});
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
 app.listen(PORT, () => {
