@@ -616,9 +616,11 @@ body {
 
 .terminal-body {
   padding: 1.5rem;
+  padding-bottom: 1rem;
   font-family: var(--font-mono);
   font-size: 0.85rem;
-  height: 300px;
+  min-height: 0;
+  max-height: 400px;
   overflow-y: auto;
   color: var(--hacker-green);
   text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);

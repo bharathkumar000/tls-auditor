@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { jsPDF } from 'jspdf';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Shield, 
@@ -15,7 +16,7 @@ import {
 import { runAudit, saveAuditLog } from '../services/auditService';
 
 function DashboardPage({ user, onLogout }) {
-  const [url, setUrl] = useState(() => sessionStorage.getItem('tls_audit_url') || '');
+  const [url, setUrl] = useState('');
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditResults, setAuditResults] = useState(() => {
     const saved = sessionStorage.getItem('tls_audit_results');
@@ -82,6 +83,149 @@ function DashboardPage({ user, onLogout }) {
   };
 
   // Rendering logic for Results or Scanner
+  const generateReport = () => {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const W = doc.internal.pageSize.getWidth();
+    const vulnerabilities = auditResults.scans.flatMap(s => s.issues);
+    const matchedVulns = auditResults.scans.flatMap(s => s.matchedVulnerabilities || []);
+    let safetyScoreLocal = auditResults.overallStatus === 'SECURE' ? 95 : Math.max(10, 100 - (vulnerabilities.length * 20));
+    const extScore = auditResults.externalSafety?.score ?? safetyScoreLocal;
+    const unified = Math.round((safetyScoreLocal * 0.4) + (extScore * 0.6));
+    const statusLabel = unified >= 85 ? 'SAFE' : unified >= 60 ? 'NOT SAFE' : 'VULNERABLE';
+    const ts = new Date().toLocaleString();
+
+    // ── Background ──
+    doc.setFillColor(10, 10, 10);
+    doc.rect(0, 0, W, 297, 'F');
+
+    // ── Header bar ──
+    doc.setFillColor(20, 20, 20);
+    doc.rect(0, 0, W, 38, 'F');
+    doc.setDrawColor(212, 175, 55);
+    doc.setLineWidth(0.5);
+    doc.line(0, 38, W, 38);
+
+    // ── Logo text ──
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(212, 175, 55);
+    doc.text('⚡ TLS_AUDITOR', 14, 20);
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 150);
+    doc.text('CLASSIFIED SECURITY ASSESSMENT REPORT', 14, 28);
+    doc.text(`GENERATED: ${ts}`, 14, 33);
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(180, 180, 180);
+    doc.text('CONFIDENTIAL // FOR AUTHORIZED PERSONNEL ONLY', W - 14, 20, { align: 'right' });
+
+    // ── Target ──
+    let y = 50;
+    doc.setFillColor(25, 25, 25);
+    doc.roundedRect(14, y - 5, W - 28, 16, 2, 2, 'F');
+    doc.setDrawColor(50, 50, 50);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(14, y - 5, W - 28, 16, 2, 2, 'S');
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(212, 175, 55);
+    doc.text('TARGET_ENDPOINT', 20, y + 2);
+    doc.setFont('courier', 'normal');
+    doc.setTextColor(255, 255, 255);
+    doc.text(auditResults.target, 75, y + 2);
+    y += 22;
+
+    // ── Score Grid ──
+    const cards = [
+      { label: 'UNIFIED THREAT INDEX', value: `${unified}%`, color: unified >= 85 ? [39,201,63] : unified >= 60 ? [255,189,46] : [255,75,75] },
+      { label: 'INTERNAL AUDIT', value: `${safetyScoreLocal}%`, color: [212,175,55] },
+      { label: 'EXTERNAL INTEL', value: `${extScore}%`, color: [81,175,239] },
+      { label: 'OVERALL STATUS', value: statusLabel, color: unified >= 85 ? [39,201,63] : unified >= 60 ? [255,189,46] : [255,75,75] },
+    ];
+    const cardW = (W - 28 - 9) / 4;
+    cards.forEach((c, i) => {
+      const x = 14 + i * (cardW + 3);
+      doc.setFillColor(20, 20, 20);
+      doc.roundedRect(x, y, cardW, 24, 2, 2, 'F');
+      doc.setDrawColor(c.color[0], c.color[1], c.color[2]);
+      doc.setLineWidth(0.4);
+      doc.roundedRect(x, y, cardW, 24, 2, 2, 'S');
+      doc.setFont('courier', 'normal');
+      doc.setFontSize(5.5);
+      doc.setTextColor(150, 150, 150);
+      doc.text(c.label, x + cardW / 2, y + 7, { align: 'center' });
+      doc.setFont('courier', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(c.color[0], c.color[1], c.color[2]);
+      doc.text(c.value, x + cardW / 2, y + 18, { align: 'center' });
+    });
+    y += 32;
+
+    // ── Intelligence source ──
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    doc.text(`INTELLIGENCE_SOURCE: ${auditResults.externalSafety?.provider || 'UNKNOWN'}`, 14, y);
+    y += 12;
+
+    // ── Section divider ──
+    doc.setDrawColor(40, 40, 40);
+    doc.setLineWidth(0.3);
+    doc.line(14, y, W - 14, y);
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(212, 175, 55);
+    doc.text('│ TLS_PROTOCOL_STACK_ANALYSIS', 14, y + 7);
+    y += 14;
+
+    // ── Protocol entries ──
+    auditResults.scans.forEach((scan, i) => {
+      if (y > 270) { doc.addPage(); doc.setFillColor(10,10,10); doc.rect(0,0,W,297,'F'); y = 20; }
+      doc.setFillColor(18, 18, 18);
+      doc.roundedRect(14, y, W - 28, scan.issues.length > 0 ? 10 + scan.issues.length * 7 : 16, 2, 2, 'F');
+
+      const statusColor = scan.status === 'SECURE' ? [39,201,63] : [255,189,46];
+      doc.setFont('courier', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+      doc.text(`[${String(i+1).padStart(2,'0')}]  ${scan.protocol} :: ${scan.cipher}`, 20, y + 7);
+
+      doc.setFont('courier', 'normal');
+      doc.setFontSize(6);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Extraction methodology: Active certificate handshake analysis.', 20, y + 13);
+
+      let issY = y + 19;
+      scan.issues.forEach(iss => {
+        const c = iss.startsWith('[CRITICAL]') ? [255,75,75] : iss.startsWith('[HIGH]') ? [255,189,46] : [224,172,87];
+        doc.setFont('courier', 'normal');
+        doc.setFontSize(5.8);
+        doc.setTextColor(c[0], c[1], c[2]);
+        const lines = doc.splitTextToSize(`  ${iss}`, W - 40);
+        doc.text(lines, 22, issY);
+        issY += lines.length * 5.5;
+      });
+
+      y += (scan.issues.length > 0 ? 14 + scan.issues.length * 7 : 20);
+    });
+
+    // ── Footer ──
+    const totalPages = doc.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      doc.setDrawColor(40, 40, 40);
+      doc.setLineWidth(0.3);
+      doc.line(14, 285, W - 14, 285);
+      doc.setFont('courier', 'normal');
+      doc.setFontSize(5.5);
+      doc.setTextColor(80, 80, 80);
+      doc.text('TLS_AUDITOR // CLASSIFIED REPORT', 14, 290);
+      doc.text(`Page ${p} of ${totalPages}`, W - 14, 290, { align: 'right' });
+    }
+
+    doc.save(`TLS_AUDIT_${auditResults.target.replace(/[^a-z0-9]/gi,'_')}_${Date.now()}.pdf`);
+  };
+
   if (showResults && auditResults) {
     const vulnerabilities = auditResults.scans.flatMap(s => s.issues);
     const matchedVulns = auditResults.scans.flatMap(s => s.matchedVulnerabilities || []);
@@ -177,6 +321,33 @@ function DashboardPage({ user, onLogout }) {
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#51afef' }}></div> EXTERNAL
                 </div>
               </div>
+
+              {/* ── Download Report Button ── */}
+              <button
+                onClick={generateReport}
+                style={{
+                  marginTop: '1.5rem',
+                  background: 'linear-gradient(135deg, #d4af37, #f0c040)',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  padding: '0.65rem 1.6rem',
+                  fontFamily: 'var(--font-mono)',
+                  fontWeight: '900',
+                  fontSize: '0.75rem',
+                  letterSpacing: '0.1rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  boxShadow: '0 0 20px rgba(212,175,55,0.3)',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 30px rgba(212,175,55,0.6)'}
+                onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 20px rgba(212,175,55,0.3)'}
+              >
+                ⬇ DOWNLOAD_REPORT.PDF
+              </button>
             </div>
           </div>
         </div>
@@ -193,7 +364,7 @@ function DashboardPage({ user, onLogout }) {
           </div>
           <div className="terminal-body">
             {auditResults.scans.map((scan, i) => (
-              <div key={i} style={{ marginBottom: '0.75rem' }}>
+              <div key={i} style={{ marginBottom: '0.25rem' }}>
                 <div className="terminal-line success">
                   <span className="time">[{String(i + 1).padStart(2, '0')}]</span>
                   <span className="msg" style={{ color: scan.status === 'SECURE' ? '#27c93f' : '#ffbd2e', fontWeight: 'bold' }}>
@@ -285,7 +456,7 @@ function DashboardPage({ user, onLogout }) {
         </form>
       </div>
 
-      <div className="terminal-preview">
+      <div className="terminal-preview" style={{ marginTop: '1.5rem' }}>
         <div className="terminal-header">
           <div className="terminal-dots"><span></span><span></span><span></span></div>
           <div className="terminal-title">operator@tls-auditor: ~/scout</div>

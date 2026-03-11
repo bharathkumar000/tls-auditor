@@ -58,6 +58,12 @@ function App() {
   const handleLoginSuccess = (userData) => {
     setIsLoggedIn(true);
     setUser(userData);
+    setActiveView('dashboard'); // Ensure we always land on home/dashboard
+    
+    // Clear previous scan results to land on a fresh "Home" page
+    sessionStorage.removeItem('tls_show_results');
+    sessionStorage.removeItem('tls_audit_results');
+    
     localStorage.setItem('tls_session_active', 'true');
   };
 
