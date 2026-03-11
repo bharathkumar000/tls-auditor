@@ -463,7 +463,7 @@ async function setupVite() {
     });
     app.use(vite.middlewares);
     
-    app.get('*', async (req, res, next) => {
+    app.get('*all', async (req, res, next) => {
       if (req.path.startsWith('/api')) return next();
       try {
         const fs = require('fs');
@@ -477,7 +477,7 @@ async function setupVite() {
   } else {
     const staticPath = path.join(__dirname, "dist");
     app.use(express.static(staticPath));
-    app.get('*', (req, res) => {
+    app.get('*all', (req, res) => {
       res.sendFile(path.join(staticPath, "index.html"));
     });
   }
