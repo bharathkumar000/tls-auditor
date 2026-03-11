@@ -4,13 +4,14 @@ import { logout } from './services/authService';
 import LoginPage from './pages/Login';
 import DashboardPage from './pages/Dashboard';
 import HistoryPage from './pages/History';
+import DomainsPage from './pages/Domains';
 import TopNav from './components/TopNav';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return localStorage.getItem('tls_session_active') === 'true';
   });
-  const [activeView, setActiveView] = useState('dashboard'); // 'dashboard' | 'vulndb'
+  const [activeView, setActiveView] = useState('dashboard'); // 'dashboard' | 'domains' | 'history'
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('tls_user_data');
     return saved ? JSON.parse(saved) : null;
@@ -91,11 +92,14 @@ function App() {
 
       {activeView === 'dashboard' ? (
         <DashboardPage user={user} onLogout={handleLogout} />
+      ) : activeView === 'domains' ? (
+        <DomainsPage user={user} onReAudit={(target) => {
+          setActiveView('dashboard');
+          if (target) sessionStorage.setItem('tls_audit_url', target);
+        }} />
       ) : (
         <HistoryPage user={user} onReAudit={(target) => {
           setActiveView('dashboard');
-          // If we had a setter for url in DashboardPage, we'd pass it here.
-          // For now, it will use sessionStorage if shared, or we can add a bridge.
           if (target) sessionStorage.setItem('tls_audit_url', target);
         }} />
       )}

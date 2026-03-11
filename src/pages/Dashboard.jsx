@@ -301,9 +301,15 @@ function DashboardPage({ user, onLogout }) {
             )}
           </div>
 
-          <div className="safety-score-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="safety-score-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
             <p className="percentage-label">Visual Threat Vector</p>
-            <div className="chart-container" style={{ marginTop: '1rem' }}>
+            <div className="chart-container" style={{ 
+              marginTop: '1.5rem', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              width: '100%' 
+            }}>
               <svg viewBox="0 0 110 110" className="circular-chart" style={{ width: '220px', height: '220px' }}>
                 {/* Unified Score - Outer Ring */}
                 <circle className="circle-bg" cx="55" cy="55" r="50"></circle>
@@ -313,15 +319,23 @@ function DashboardPage({ user, onLogout }) {
                 <circle className="circle-bg" cx="55" cy="55" r="38" style={{ strokeWidth: '2', opacity: '0.3' }}></circle>
                 <circle className="circle" cx="55" cy="55" r="38" style={{ strokeDasharray: strokeDasharrayExternal, stroke: '#51afef', strokeWidth: '3.5', opacity: '0.8' }}></circle>
               </svg>
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', fontSize: '0.6rem', opacity: 0.7 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: statusObj.color }}></div> UNIFIED
+              
+              <div style={{ 
+                display: 'flex', 
+                gap: '1.5rem', 
+                marginTop: '1.5rem', 
+                fontSize: '0.7rem', 
+                opacity: 0.8,
+                letterSpacing: '0.1em',
+                fontWeight: 'bold'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: statusObj.color }}></div> UNIFIED
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#51afef' }}></div> EXTERNAL
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#51afef' }}></div> EXTERNAL
                 </div>
               </div>
-
             </div>
           </div>
         </div>
@@ -444,6 +458,7 @@ function DashboardPage({ user, onLogout }) {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               style={{ width: '100%', paddingRight: '10rem' }}
+              autoComplete="off"
             />
             <button 
               className="run-btn" 
