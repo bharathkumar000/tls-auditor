@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Mail, 
+  Phone, 
   Lock, 
   Github, 
   Chrome, 
@@ -11,10 +11,12 @@ import {
   Cpu
 } from 'lucide-react';
 import { supabase } from './supabase';
+import Dashboard from './Dashboard';
 
 function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('1');
+  const [phone, setPhone] = useState('1');
   const [password, setPassword] = useState('1');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,25 +28,25 @@ function App() {
     setError(null);
     
     // Mock bypass for dev/testing
-    if (email === '1' && password === '1' && isLogin) {
+    if (phone === '1' && password === '1' && isLogin) {
       setTimeout(() => {
         setLoading(false);
-        alert('ACCESS GRANTED: Developer Session Initialized');
+        setIsLoggedIn(true);
       }, 1000);
       return;
     }
     
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
+        const { error, data } = await supabase.auth.signInWithPassword({
+          phone,
           password,
         });
         if (error) throw error;
-        alert('Login successful!');
+        setIsLoggedIn(true);
       } else {
         const { error } = await supabase.auth.signUp({
-          email,
+          phone,
           password,
           options: {
             data: {
@@ -62,6 +64,10 @@ function App() {
       setLoading(false);
     }
   };
+
+  if (isLoggedIn) {
+    return <Dashboard onLogout={() => setIsLoggedIn(false)} />;
+  }
 
   return (
     <div className="login-container">
@@ -128,15 +134,15 @@ function App() {
           )}
 
           <div className="form-group">
-            <label className="label">Endpoint Identifier</label>
+            <label className="label">Contact Number</label>
             <div className="input-wrapper">
-              <Mail className="input-icon" size={18} />
+              <Phone className="input-icon" size={18} />
               <input 
-                type="email" 
+                type="tel" 
                 className="input" 
-                placeholder="developer@tls-auditor.dev"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder="+91 98765 43210"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 required
               />
             </div>
