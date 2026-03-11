@@ -9,12 +9,18 @@ import { getAssetInventory } from '../services/auditService';
 function HistoryPage({ user, onReAudit }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (user?.email) {
       setLoading(true);
+      setError(null);
       getAssetInventory(user.email)
         .then(data => setHistory(data))
+        .catch(err => {
+          console.error("Database Fetch Error:", err);
+          setError(err.message || "Failed to retrieve registered assets.");
+        })
         .finally(() => setLoading(false));
     }
   }, [user]);
