@@ -7,10 +7,11 @@ import {
   Loader2,
   AlertCircle 
 } from 'lucide-react';
-import { getAssetInventory } from '../services/auditService';
+import { getAssetInventory, getRegisteredAssets } from '../services/auditService';
 
 function RecordsPage({ user, onReAudit }) {
   const [allLogs, setAllLogs] = useState([]);
+  const [registeredDocs, setRegisteredDocs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -18,30 +19,32 @@ function RecordsPage({ user, onReAudit }) {
     if (user?.phone || user?.email) {
       setLoading(true);
       setError(null);
-      getAssetInventory(user.phone, user.email)
-        .then(data => setAllLogs(data))
+      
+      const p1 = getAssetInventory(user.phone, user.email);
+      const p2 = getRegisteredAssets(user.phone, user.email);
+
+      Promise.all([p1, p2])
+        .then(([history, registered]) => {
+          setAllLogs(history);
+          setRegisteredDocs(registered);
+        })
         .catch(err => {
-          console.error("Database Fetch Error:", err);
-          setError(err.message || "Failed to retrieve registered assets.");
+          console.error("Mission Sync Error:", err);
+          setError(err.message || "Failed to synchronize node intelligence.");
         })
         .finally(() => setLoading(false));
     }
   }, [user?.phone, user?.email]);
 
-  // Derive unique domains for the "My Domains" column (with active blacklist enforcement)
+  // Tactical Filtering Architecture
+  const registeredUrls = new Set(registeredDocs.map(d => d.domain_url.toLowerCase()));
   const blacklist = ['yahoo.com', 'github.com', 'gab.com', 'guthub.com'];
   
-  const filteredLogs = allLogs.filter(log => 
-    !blacklist.some(b => log.url.toLowerCase().includes(b))
-  );
-
-  const uniqueDomains = [];
-  const seenUrls = new Set();
-  filteredLogs.forEach(log => {
-    if (!seenUrls.has(log.url)) {
-      uniqueDomains.push(log);
-      seenUrls.add(log.url);
-    }
+  // History shows only GUEST nodes (non-registered)
+  const historyLogs = allLogs.filter(log => {
+    const isRegistered = registeredUrls.has(log.url.toLowerCase());
+    const isBlacklisted = blacklist.some(b => log.url.toLowerCase().includes(b));
+    return !isRegistered && !isBlacklisted;
   });
 
   const getStatusColor = (score) => {
@@ -77,18 +80,18 @@ function RecordsPage({ user, onReAudit }) {
             <div className="column-header">
               <Globe size={18} className="gold-text" />
               <h3>REGISTERED_INFRASTRUCTURE_NODES</h3>
-              <div className="badge">{uniqueDomains.length} ASSETS</div>
+              <div className="badge">{registeredDocs.length} ASSETS</div>
             </div>
             <div className="records-grid">
-              {uniqueDomains.length === 0 ? (
+              {registeredDocs.length === 0 ? (
                 <div className="empty-state">No infrastructure nodes registered for this account.</div>
               ) : (
-                uniqueDomains.map((domain, i) => (
+                registeredDocs.map((domain, i) => (
                   <div key={i} className="record-card registered-node">
                     <div className="record-main">
-                      <div className="record-url">{domain.url}</div>
+                      <div className="record-url">{domain.domain_url}</div>
                     </div>
-                    <button className="audit-mini-btn" onClick={() => onReAudit(domain.url)}>
+                    <button className="audit-mini-btn" onClick={() => onReAudit(domain.domain_url)}>
                       <Zap size={14} />
                     </button>
                   </div>
@@ -104,13 +107,13 @@ function RecordsPage({ user, onReAudit }) {
             <div className="column-header">
               <HistoryIcon size={18} className="gold-text" />
               <h3>PERSISTENT_MISSION_HISTORY</h3>
-              <div className="badge">{filteredLogs.length} LOGS</div>
+              <div className="badge">{historyLogs.length} LOGS</div>
             </div>
             <div className="records-grid">
-              {filteredLogs.length === 0 ? (
+              {historyLogs.length === 0 ? (
                 <div className="empty-state">Secure node mission history is currently empty.</div>
               ) : (
-                filteredLogs.map((log, i) => (
+                historyLogs.map((log, i) => (
                   <div key={i} className="record-card history-node">
                     <div className="record-main">
                       <div className="record-url">{log.url}</div>
