@@ -430,21 +430,22 @@ app.post("/api/audit", async (req, res) => {
     // 🛡️ CRYPTCHECK INTELLIGENCE RESOLUTION
     const cryptCheck = await cryptCheckPromise;
     
-    let externalScore = null;
-    let provider = 'CRYPTCHECK';
+    let externalScore = 0; // Default to 0 if NO data is available
+    let provider = cryptCheck && cryptCheck.grade ? 'CRYPTCHECK' : 'INTERNAL_SCANNER';
 
     if (cryptCheck && cryptCheck.grade) {
       const gradeMap = { 'A+': 100, 'A': 95, 'B': 80, 'C': 60, 'D': 40, 'E': 20, 'F': 0 };
-      externalScore = gradeMap[cryptCheck.grade] ?? 50;
+      externalScore = gradeMap[cryptCheck.grade] ?? 0;
     }
 
-    // Final Unified Score Resolution
-    const resultScore = { provider, score: externalScore };
+    // 🔍 MISSION SCORING LOGIC
+    let safetyScoreLocal = 0;
+    const isCriticalFailure = finalResults.scans.length === 0 || (finalResults.scans.length === 1 && finalResults.scans[0].protocol === 'NONE_DETECTED');
 
-    // 🔍 MISSION SCORING LOGIC: If no TLS protocols are supported, it's a critical failure.
-    if (finalResults.scans.length === 0 || (finalResults.scans.length === 1 && finalResults.scans[0].protocol === 'NONE_DETECTED')) {
+    if (isCriticalFailure) {
       finalResults.overallStatus = "CRITICAL";
-      resultScore.score = 0; 
+      safetyScoreLocal = 0;
+      externalScore = 0; // Force zero for total failure
       if (finalResults.scans.length === 0) {
         finalResults.scans.push({
           protocol: "PLAINTEXT_HTTP",
@@ -452,7 +453,7 @@ app.post("/api/audit", async (req, res) => {
           status: "ABSOLUTE_CRITICAL",
           cipherBits: 0,
           issues: [
-            "[CRITICAL] NO_TLS_SHAKEHAND: This endpoint failed all secure negotiation attempts.", 
+            "[CRITICAL] NO_TLS_HANDSHAKE: This endpoint failed all secure negotiation attempts.", 
             "[ABSOLUTE_FAILURE] Broadcasting in Plaintext (HTTP). Data is vulnerable to instant interception.",
             "[SECURITY_BREACH] No cryptographic layer detected on mission-critical port."
           ],
@@ -462,37 +463,55 @@ app.post("/api/audit", async (req, res) => {
           quickSnippet: "CRITICAL: This node is broadcasting in plaintext. Execute lockout protocols."
         });
       }
-    } else if (resultScore.score === null) {
-      // ── INTERNAL SCORING ENGINE (TACTICAL BIT CONSIDERATION) ──
-      const vulnerabilities = finalResults.scans.flatMap(s => s.matchedVulnerabilities);
+    } else {
+      // ── INTERNAL SCORING ENGINE (TACTICAL MISSION MATRIX) ──
       let penalty = 0;
-      let worstCipherBits = 256;
+      let bonus = 0;
+      let hasTLS13 = false;
+      let hasHSTS = false; // Note: In a real environment, we would probe for headers. Simulated here for parity.
 
-      vulnerabilities.forEach(v => {
-        if (v.severity === 'CRITICAL') penalty += 30;
-        if (v.severity === 'HIGH') penalty += 22; // Increased for TLS 1.0/1.1 visibility
-        if (v.severity === 'MEDIUM') penalty += 8;
-        if (v.severity === 'RSA_PENALTY_20') penalty += 30; // Sub-1024 bit is now critical
-        if (v.severity === 'RSA_PENALTY_10') penalty += 15; // 1024 bit is now HIGH risk
-      });
-
-      // Bit Consideration: Penalize weak encryption depth
+      const vulnerabilities = finalResults.scans.flatMap(s => s.matchedVulnerabilities);
+      
+      // 1. Protocol Specifics
       finalResults.scans.forEach(s => {
-        if (s.cipherBits > 0 && s.cipherBits < worstCipherBits) worstCipherBits = s.cipherBits;
+        if (s.protocol === 'TLSv1.3') hasTLS13 = true;
+        if (s.protocol.match(/SSLv[23]/)) penalty += 100; // Instant F
+        if (s.protocol === 'TLSv1' || s.protocol === 'TLSv1.1') penalty += 20;
       });
 
-      // Calibrated Bit-Depth Penalties (High-Precision Audit)
-      if (worstCipherBits < 128) {
-        penalty += 50; // Legacy / Broken Encryption Depth
-      } else if (worstCipherBits < 256) {
-        penalty += 25; // Sub-standard (128-bit) - downgraded from 'Secure'
-      }
+      // 2. Cipher & Integrity Rules
+      vulnerabilities.forEach(v => {
+        const cat = v.category?.toUpperCase() || "";
+        const name = v.cipherName?.toUpperCase() || "";
+        
+        if (name.includes("NULL")) penalty += 100; // Instant F
+        if (name.includes("RC4") || name.includes("3DES")) penalty += 40;
+        if (name.includes("CBC") && !hasTLS13) penalty += 15;
+        
+        // Key Exchange & FS
+        if (!name.includes("DHE") && !name.includes("ECDHE")) penalty += 10; // No Forward Secrecy
+        
+        // Certificate Signatures
+        if (v.id === "SHA1_CERT") penalty += 25;
+      });
 
-      resultScore.score = Math.max(5, 100 - penalty);
-      resultScore.provider = 'INTERNAL_SCANNER';
+      // 3. Bit-Depth & DH Parameters (RSA < 2048)
+      finalResults.scans.forEach(s => {
+        if (s.cert && s.cert.bits && s.cert.bits < 2048) penalty += 30;
+      });
+
+      // 4. Header & TLS 1.3 Logic
+      if (hasTLS13) bonus += 10;
+      if (!hasHSTS) penalty += 5; // HSTS Missing
+
+      safetyScoreLocal = Math.max(0, Math.min(100, (100 - penalty + bonus)));
     }
 
-    finalResults.externalSafety = resultScore;
+    // Wrap-up Unified Result
+    finalResults.safetyScoreLocal = safetyScoreLocal;
+    finalResults.externalScore = externalScore; 
+    finalResults.safetyScore = Math.round((safetyScoreLocal * 0.4) + (externalScore * 0.6));
+    finalResults.externalSafety = { provider, score: externalScore };
     finalResults.cryptCheck = cryptCheck;
     
     console.log(`[AUDIT_SUCCESS] ${host} - Scans: ${finalResults.scans.length}`);
