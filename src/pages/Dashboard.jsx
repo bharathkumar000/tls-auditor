@@ -31,8 +31,8 @@ function DashboardPage({ user, onLogout }) {
     return sessionStorage.getItem('tls_show_results') === 'true';
   });
   const [terminalLogs, setTerminalLogs] = useState([
-    { time: new Date().toLocaleTimeString(), type: 'info', msg: 'SYSTEM_SYNC_ACTIVE: Layout version 2.5 initialized.' },
-    { time: new Date().toLocaleTimeString(), type: 'success', msg: 'Hot-Swap applied: Perfectly centered architecture enabled.' }
+    { time: new Date().toLocaleTimeString(), type: 'info', msg: 'CORE_ENGINE_READY: High-Fidelity Scanning Module Online.' },
+    { time: new Date().toLocaleTimeString(), type: 'success', msg: 'Tactical Interface v2.8 stabilized. Awaiting Mission Parameter...' }
   ]);
   const [showReportButton, setShowReportButton] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
@@ -74,15 +74,18 @@ function DashboardPage({ user, onLogout }) {
       setIsRegistered(registered);
       
       if (registered) {
-        addLog('AUTHORIZED_NODE_DETECTED: Enabling administrative command suite.', 'success');
+        addLog(`AUTHORIZED_INFRASTRUCTURE: [${url}] identified in operator vault.`, 'success');
+        addLog('Enabling administrative modification protocols (REQUEST_CHANGES).', 'info');
+      } else {
+        addLog(`GUEST_INFRASTRUCTURE: [${url}] is outside authorized perimeter. Monitoring only.`, 'warn');
       }
 
-      addLog('Audit complete. Secure record generated.', 'success');
+      addLog('Audit complete. Cryptographic safety report generated.', 'success');
       setShowReportButton(true);
 
       // Persist to user's history
       await saveAuditLog(url, user, results);
-      addLog('Inventory entry successfully synchronized.', 'info');
+      addLog('Mission history updated with high-fidelity scan artifacts.', 'info');
       
     } catch (err) {
       addLog(`AUDIT_FAILED: ${err.message}`, 'error');
@@ -456,133 +459,110 @@ function DashboardPage({ user, onLogout }) {
             <Download size={20} /> DOWNLOAD_REPORT.PDF
           </button>
         </div>
-      </main>
 
-      {/* ── MISSION_ERROR_POPUP ── */}
-      <AnimatePresence>
-        {urlError && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="modal-overlay"
-          >
+        {/* ── MISSION_ERROR_POPUP ── */}
+        <AnimatePresence>
+          {urlError && (
             <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="error-popup-card"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="modal-overlay"
             >
-              <div className="popup-header">
-                <AlertTriangle className="error-icon" size={24} />
-                <h3>SECURE_NODE_ERROR</h3>
-                <button className="close-popup" onClick={() => setUrlError(null)}>
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="popup-body">
-                <p className="error-code">ERROR_CODE: 404_DEPLOYMENT_NOT_FOUND</p>
-                <p className="error-msg">{urlError}</p>
-                <div className="popup-action">
-                  <button className="remedy-btn" onClick={() => { setUrlError(null); setUrl(''); }}>
-                    CLEAR_ENDPOINT_CACHE
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="error-popup-card"
+              >
+                <div className="popup-header">
+                  <AlertTriangle className="error-icon" size={24} />
+                  <h3>SECURE_NODE_ERROR</h3>
+                  <button className="close-popup" onClick={() => setUrlError(null)}>
+                    <X size={20} />
                   </button>
                 </div>
-              </div>
+                <div className="popup-body">
+                  <p className="error-code">ERROR_CODE: 404_DEPLOYMENT_NOT_FOUND</p>
+                  <p className="error-msg">{urlError}</p>
+                  <div className="popup-action">
+                    <button className="remedy-btn" onClick={() => { setUrlError(null); setUrl(''); }}>
+                      CLEAR_ENDPOINT_CACHE
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
-      <style jsx>{`
-        .modal-overlay {
-          position: fixed;
-          top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(0, 0, 0, 0.85);
-          backdrop-filter: blur(8px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 9999;
-          padding: 2rem;
-        }
-        .error-popup-card {
-          background: #121212;
-          border: 1px solid #ff4b4b;
-          border-radius: 12px;
-          width: 100%;
-          max-width: 480px;
-          box-shadow: 0 0 50px rgba(255, 75, 75, 0.2);
-          overflow: hidden;
-        }
-        .popup-header {
-          background: rgba(255, 75, 75, 0.1);
-          padding: 1.25rem 1.5rem;
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          border-bottom: 1px solid rgba(255, 75, 75, 0.2);
-        }
-        .popup-header h3 {
-          font-family: var(--font-mono);
-          margin: 0;
-          font-size: 1rem;
-          letter-spacing: 0.1em;
-          color: #ff4b4b;
-          font-weight: 800;
-        }
-        .error-icon {
-          color: #ff4b4b;
-        }
-        .close-popup {
-          margin-left: auto;
-          background: transparent;
-          border: none;
-          color: var(--text-gray);
-          cursor: pointer;
-          transition: 0.2s;
-        }
-        .close-popup:hover {
-          color: white;
-          transform: scale(1.1);
-        }
-        .popup-body {
-          padding: 2rem 1.5rem;
-        }
-        .error-code {
-          font-family: var(--font-mono);
-          font-size: 0.7rem;
-          color: var(--text-gray);
-          margin-bottom: 0.5rem;
-          opacity: 0.6;
-        }
-        .error-msg {
-          color: white;
-          font-size: 0.95rem;
-          line-height: 1.6;
-          margin-bottom: 2rem;
-          font-weight: 500;
-        }
-        .remedy-btn {
-          width: 100%;
-          background: #ff4b4b;
-          color: white;
-          border: none;
-          padding: 1rem;
-          border-radius: 8px;
-          font-family: var(--font-mono);
-          font-weight: 900;
-          letter-spacing: 0.1em;
-          cursor: pointer;
-          transition: 0.3s;
-        }
-        .remedy-btn:hover {
-          background: #ff3333;
-          transform: translateY(-2px);
-          box-shadow: 0 5px 15px rgba(255, 75, 75, 0.3);
-        }
-      `}</style>
-    </main>
+        <style jsx>{`
+          .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 2rem;
+          }
+          .error-popup-card {
+            background: #121212;
+            border: 1px solid #ff4b4b;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 480px;
+            box-shadow: 0 0 50px rgba(255, 75, 75, 0.2);
+            overflow: hidden;
+          }
+          .popup-header {
+            background: rgba(255, 75, 75, 0.1);
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            border-bottom: 1px solid rgba(255, 75, 75, 0.2);
+          }
+          .popup-header h3 {
+            font-family: var(--font-mono);
+            margin: 0;
+            font-size: 1rem;
+            letter-spacing: 0.1em;
+            color: #ff4b4b;
+            font-weight: 800;
+          }
+          .error-icon { color: #ff4b4b; }
+          .close-popup {
+            margin-left: auto;
+            background: transparent;
+            border: none;
+            color: var(--text-gray);
+            cursor: pointer;
+            transition: 0.2s;
+          }
+          .close-popup:hover {
+            color: white;
+            transform: scale(1.1);
+          }
+          .popup-body { padding: 2rem 1.5rem; }
+          .error-code {
+            font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-gray); margin-bottom: 0.5rem; opacity: 0.6;
+          }
+          .error-msg { color: white; font-size: 0.95rem; line-height: 1.6; margin-bottom: 2rem; font-weight: 500; }
+          .remedy-btn {
+            width: 100%; background: #ff4b4b; color: white; border: none; padding: 1rem;
+            border-radius: 8px; font-family: var(--font-mono); font-weight: 900; letter-spacing: 0.1em;
+            cursor: pointer; transition: 0.3s;
+          }
+          .remedy-btn:hover {
+            background: #ff3333;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 75, 75, 0.3);
+          }
+        `}</style>
+      </main>
     );
   }
 
@@ -636,17 +616,17 @@ function DashboardPage({ user, onLogout }) {
           <div className="terminal-dots"><span></span><span></span><span></span></div>
           <div className="terminal-title">operator@tls-auditor: ~/scout</div>
         </div>
-        <div className="terminal-body">
+        <div className="terminal-body" style={{ minHeight: '160px' }}>
           {terminalLogs.map((log, i) => (
             <div key={i} className={`terminal-line ${log.type}`}>
-              <span className="time">[{log.time}]</span>
+              <span className="time">{log.time}</span>
               <span className="msg">{log.msg}</span>
             </div>
           ))}
           {isAuditing && (
             <div className="terminal-line typing">
-              <span className="time">[{new Date().toLocaleTimeString()}]</span>
-              <span className="msg">Executing hardware-level scan...</span>
+              <span className="time">{new Date().toLocaleTimeString()}</span>
+              <span className="msg">Executing hardware-level handshake analysis...</span>
               <span className="cursor"></span>
             </div>
           )}
