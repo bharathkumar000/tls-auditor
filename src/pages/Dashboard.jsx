@@ -14,7 +14,8 @@ import {
   ExternalLink,
   Edit3,
   Download,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import { runAudit, saveAuditLog, isDomainRegistered } from '../services/auditService';
 
@@ -454,14 +455,18 @@ function DashboardPage({ user, onLogout }) {
           </div>
         </div>
 
-        {/* ── MISSION COMMAND ACTIONS ── */}
         <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center', marginTop: '3rem', paddingBottom: '4rem' }}>
           {isRegistered && (
-            <button className="run-btn secondary" style={{ background: 'rgba(212, 175, 55, 0.1)', color: 'var(--gold-primary)', borderColor: 'var(--gold-primary)40', padding: '1rem 3rem' }}>
-              <Edit3 size={18} style={{ marginRight: '8px' }} /> REQUEST_CHANGES.MOD
-            </button>
+            <>
+              <button className="run-btn" style={{ padding: '1rem 2.5rem' }}>
+                <Edit3 size={18} /> REQUEST_CHANGES.MOD
+              </button>
+              <button className="run-btn" onClick={() => setShowResults(false)} style={{ padding: '1rem 2.5rem' }}>
+                <RefreshCw size={18} /> CHANGE
+              </button>
+            </>
           )}
-          <button className="run-btn" onClick={generateReport} style={{ gap: '0.8rem', padding: '1rem 3rem' }}>
+          <button className="run-btn" onClick={generateReport} style={{ padding: '1rem 2.5rem' }}>
             <Download size={20} /> DOWNLOAD_REPORT.PDF
           </button>
         </div>
