@@ -5,11 +5,25 @@ import { supabase } from '../supabaseClient';
  * Performs a TLS/SSL scan via the local Express server.
  */
 export const runAudit = async (url) => {
-  const response = await fetch('/api/audit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url })
-  });
+  // 🛰️ TACTICAL PORT FUSION: Try local node if relative fetch fails
+  const apiEndpoint = '/api/audit';
+  const localFallBack = 'http://localhost:9090/api/audit';
+
+  let response;
+  try {
+    response = await fetch(apiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+  } catch (e) {
+    // If relative fails (e.g. on Vercel), attempt local high-fidelity node
+    response = await fetch(localFallBack, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+  }
 
   if (!response.ok) {
     throw new Error(`System Error: ${response.status} - Use Port 9090`);
