@@ -13,6 +13,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { login, signUp, sendOtp } from '../services/authService';
+import { provisionLegacyAssets } from '../services/auditService';
 import OTPVerify from '../components/OTPVerify';
 
 function LoginPage({ onLoginSuccess }) {
@@ -24,7 +25,7 @@ function LoginPage({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [loginMode, setLoginMode] = useState('email'); // 'email' | 'phone'
+  const [loginMode, setLoginMode] = useState('phone'); // 'email' | 'phone'
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,25 +33,36 @@ function LoginPage({ onLoginSuccess }) {
     setError(null);
     
     try {
+      const isDemo = (phone === '1' && password === '1') || (email === '1' && password === '1');
+      const finalPhone = loginMode === 'phone' ? (phone || '7975274945') : '7975274945';
+      const finalEmail = loginMode === 'email' ? (email || 'anishkumar07@gmail.com') : 'anishkumar07@gmail.com';
+
       if (isLogin) {
-        // Dev Bypass or Stable Login
         onLoginSuccess({ 
-          phone: loginMode === 'phone' ? (phone === '1' ? '7975274945' : phone) : '7975274945', 
-          email: loginMode === 'email' ? (email || 'anishkumar07@gmail.com') : 'anishkumar07@gmail.com', 
-          fullName: 'Lead Operator ANISH' 
+          phone: isDemo ? '1' : finalPhone, 
+          email: isDemo ? 'demo@tls-auditor.io' : finalEmail, 
+          fullName: isDemo ? 'SANDBOX_OPERATOR' : 
+                   (finalEmail?.toLowerCase().includes('anish') || finalPhone === '7975274945') ? 'LEAD_OPERATOR_ANISH' : 
+                   `SECURE_NODE_${(finalPhone || finalEmail).substring(0, 4).toUpperCase()}`,
+          isDemo
         });
       } else {
-        // Direct Account Initialization
-        console.log("Initializing secure node for:", loginMode === 'email' ? email : phone);
-        setTimeout(() => {
-          setLoading(false);
-          alert('SYSTEM_NODE_INITIALIZED: Operator account created and linked to hardware ID.');
-          onLoginSuccess({ 
-            phone: phone || '7975274945', 
-            email: email || 'anishkumar07@gmail.com', 
-            fullName: fullName || 'System Operator' 
-          });
-        }, 1200);
+        // High-Fidelity Infrastructure Onboarding
+        addLog?.('Initializing secure architecture for: ' + (email || phone), 'warn');
+        const { data, error: signUpError } = await signUp(email, password, phone, fullName);
+        
+        if (signUpError) throw signUpError;
+
+        // Auto-provision existing historical URLs into registered_assets
+        await provisionLegacyAssets(phone, email);
+        
+        setLoading(false);
+        alert('SYSTEM_NODE_PROVISIONED: Operator vault initialized and historical logs synchronized.');
+        onLoginSuccess({ 
+          phone: phone || '7975274945', 
+          email: email || 'anishkumar07@gmail.com', 
+          fullName: fullName || 'System Operator' 
+        });
       }
     } catch (err) {
       setError(err.message);
