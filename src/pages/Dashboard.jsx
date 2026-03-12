@@ -14,8 +14,10 @@ import {
   ExternalLink,
   Edit3,
   Download,
-  AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  ShieldCheck,
+  FileText,
+  Code2
 } from 'lucide-react';
 import { runAudit, saveAuditLog, isDomainRegistered, createModificationRequest } from '../services/auditService';
 
@@ -286,6 +288,116 @@ function DashboardPage({ user, onLogout }) {
     doc.save(`TLS_AUDIT_${auditResults.target.replace(/[^a-z0-9]/gi,'_')}_REPT.pdf`);
   };
 
+  const downloadCertificate = () => {
+    const certData = auditResults.scans.find(s => s.cert && s.cert.raw)?.cert;
+    if (!certData || !certData.raw) return;
+
+    // Reconstruct PEM from base64 DER telemetry
+    const pem = `-----BEGIN CERTIFICATE-----\n${certData.raw.match(/.{1,64}/g).join('\n')}\n-----END CERTIFICATE-----`;
+    
+    const blob = new Blob([pem], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `TLS_CERT_${auditResults.target.replace(/[^a-z0-9]/gi,'_')}.pem`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
+
+  const downloadRecommendationBrief = () => {
+    const doc = new jsPDF();
+    const allIssues = [...new Set(auditResults.scans.flatMap(s => s.issues))];
+    const allRecs = [...new Set(auditResults.scans.flatMap(s => s.recommendations))];
+    
+    doc.setProperties({ title: `RECOMMENDATION_BRIEF_${auditResults.target}` });
+    doc.setFillColor(15, 15, 15);
+    doc.rect(0, 0, 210, 297, 'F');
+    
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(212, 175, 55);
+    doc.text('TLS_AUDITOR // RECOMMENDATION_REPORT', 20, 30);
+    
+    doc.setFontSize(9);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`TARGET: ${auditResults.target}`, 20, 40);
+    doc.text(`TIMESTAMP: ${new Date().toLocaleString()}`, 20, 45);
+    doc.line(20, 50, 190, 50);
+
+    doc.setFontSize(11);
+    doc.setTextColor(212, 175, 55);
+    doc.text('[DETECTED_VULNERABILITIES]', 20, 65);
+    
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(255, 255, 255);
+    let y = 75;
+    allIssues.forEach((iss, i) => {
+      const lines = doc.splitTextToSize(`${i + 1}. ${iss}`, 170);
+      doc.text(lines, 20, y);
+      y += (lines.length * 5) + 2;
+    });
+
+    y += 10;
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(212, 175, 55);
+    doc.text('[TACTICAL_REMEDIATION_STEPS]', 20, y);
+    
+    y += 10;
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(255, 255, 255);
+    allRecs.forEach((rec, i) => {
+      const lines = doc.splitTextToSize(`${i + 1}. ${rec}`, 170);
+      doc.text(lines, 20, y);
+      y += (lines.length * 5) + 2;
+    });
+
+    doc.save(`RECOMMENDATION_REPORT_${auditResults.target.replace(/[^a-z0-9]/gi,'_')}.pdf`);
+  };
+
+  const downloadConfigSnippet = () => {
+    const doc = new jsPDF();
+    doc.setFillColor(15, 15, 15);
+    doc.rect(0, 0, 210, 297, 'F');
+
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(212, 175, 55);
+    doc.text('HARDENED_NGINX_CONFIGURATION', 20, 30);
+    
+    doc.setFontSize(9);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`INFRASTRUCTURE_TARGET: ${auditResults.target}`, 20, 40);
+    doc.line(20, 45, 190, 45);
+
+    const config = `server {
+    listen 443 ssl http2;
+    server_name ${auditResults.target};
+
+    # MISSION_CRITICAL_SECURITY_CONFIG (TLS_AUDITOR)
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384";
+    
+    # SECURITY_HEADERS
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+}`;
+
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(255, 255, 255);
+    doc.text(config, 25, 60);
+
+    doc.save(`HARDENED_CONFIG_${auditResults.target.replace(/[^a-z0-9]/gi,'_')}.pdf`);
+  };
+
   if (showResults && auditResults) {
     const vulnerabilities = auditResults.scans.flatMap(s => s.issues);
     
@@ -380,21 +492,6 @@ function DashboardPage({ user, onLogout }) {
               </div>
             </div>
 
-            <div style={{ marginTop: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem', width: '100%' }}>
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-gray)', letterSpacing: '0.2em', fontWeight: '800' }}>INTELLIGENCE_SOURCE:</span>
-              <span style={{ 
-                background: auditResults.externalSafety.provider !== 'SIMULATED' ? 'var(--gold-primary)25' : 'rgba(255,255,255,0.08)', 
-                color: auditResults.externalSafety.provider !== 'SIMULATED' ? 'var(--gold-primary)' : 'var(--text-gray)',
-                padding: '0.3rem 0.8rem',
-                borderRadius: '0.3rem',
-                fontSize: '0.75rem',
-                fontWeight: '900',
-                fontFamily: 'var(--font-mono)',
-                border: `1px solid ${auditResults.externalSafety.provider !== 'SIMULATED' ? 'var(--gold-primary)50' : 'rgba(255,255,255,0.1)'}`
-              }}>
-                {auditResults.externalSafety.provider}
-              </span>
-            </div>
           </div>
         </div>
 
@@ -466,22 +563,29 @@ function DashboardPage({ user, onLogout }) {
 
         <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center', marginTop: '3rem', paddingBottom: '4rem' }}>
           {isRegistered && (
-            <>
-              <button 
-                className="run-btn" 
-                onClick={() => setShowRequestModal(true)}
-                style={{ padding: '1rem 2.5rem' }}
-              >
-                <Edit3 size={18} /> REQUEST_CHANGES.MOD
-              </button>
-              <button className="run-btn" onClick={() => setShowResults(false)} style={{ padding: '1rem 2.5rem' }}>
-                <RefreshCw size={18} /> CHANGE
-              </button>
-            </>
+            <button 
+              className="run-btn" 
+              onClick={() => setShowRequestModal(true)}
+              style={{ padding: '1rem 2.5rem' }}
+            >
+              <Edit3 size={18} /> REQUEST_CHANGES.MOD
+            </button>
           )}
+          
+          <button className="run-btn" onClick={downloadRecommendationBrief} style={{ padding: '1rem 2.5rem', background: 'rgba(212,175,55,0.15)', color: 'var(--gold-primary)' }}>
+            <FileText size={18} /> RECOMMENDATION_REPORT.PDF
+          </button>
+          <button className="run-btn" onClick={downloadConfigSnippet} style={{ padding: '1rem 2.5rem', background: 'rgba(255,255,255,0.05)', color: '#fff' }}>
+            <Code2 size={18} /> CONFIG_SNIPPET.PDF
+          </button>
           <button className="run-btn" onClick={generateReport} style={{ padding: '1rem 2.5rem' }}>
             <Download size={20} /> DOWNLOAD_REPORT.PDF
           </button>
+          {auditResults.scans.some(s => s.cert && s.cert.raw) && (
+            <button className="run-btn" onClick={downloadCertificate} style={{ padding: '1rem 2.5rem', background: '#51afef', color: '#000', borderColor: '#51afef70' }}>
+              <ShieldCheck size={20} /> DOWNLOAD_CERTIFICATE.PEM
+            </button>
+          )}
         </div>
 
         {/* ── MISSION_ERROR_POPUP ── */}
