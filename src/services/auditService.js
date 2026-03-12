@@ -58,6 +58,15 @@ export const saveAuditLog = async (url, user, auditData) => {
 export const getAssetInventory = async (phone, email) => {
   if (!phone && !email) return [];
   
+  if (phone === '1') {
+    return [
+      { url: 'google.com', score: 98, status: 'SECURE', protocols: 'TLS 1.3', created_at: new Date(Date.now() - 3600000).toISOString() },
+      { url: 'microsoft.com', score: 92, status: 'SECURE', protocols: 'TLS 1.2, TLS 1.3', created_at: new Date(Date.now() - 86400000).toISOString() },
+      { url: 'apple.com', score: 95, status: 'SECURE', protocols: 'TLS 1.3', created_at: new Date(Date.now() - 172800000).toISOString() },
+      { url: 'neverssl.com', score: 0, status: 'CRITICAL', protocols: 'PLAINTEXT_HTTP', created_at: new Date(Date.now() - 259200000).toISOString() }
+    ];
+  }
+
   let query = supabase.from('audit_logs').select('*');
   
   // High-Fidelity Multi-Vector Search
@@ -79,27 +88,79 @@ export const getAssetInventory = async (phone, email) => {
   return data || [];
 };
 /**
- * Verifies if a domain is registered to the current operator.
+ * Verifies if a domain is registered to the current operator via the registered_assets table.
  */
 export const isDomainRegistered = async (url, user) => {
   if (!user?.email && !user?.phone) return false;
   
   try {
-    // Check in audit_logs if there's an entry with a 'registration' flag or similar
-    // For now, we'll check if it's in a dedicated table or marked as primary
     const { data, error } = await supabase
-      .from('audit_logs')
-      .select('url')
-      .eq('url', url)
+      .from('registered_assets')
+      .select('domain_url')
+      .eq('domain_url', url)
       .or(`operator_phone.eq.${user.phone},operator_email.eq.${user.email}`)
-      .order('created_at', { ascending: false })
       .limit(1);
 
     if (error) return false;
-    // For this implementation, we treat any domain previously audited by this user as 'Registered'
-    // in the context of showing the split screen and request button.
     return data && data.length > 0;
   } catch (e) {
     return false;
+  }
+};
+
+/**
+ * Retrieves only the manually registered infrastructure nodes for an operator.
+ */
+export const getRegisteredAssets = async (phone, email) => {
+  if (!phone && !email) return [];
+  
+  if (phone === '1') return [];
+  
+  let query = supabase.from('registered_assets').select('*');
+  
+  if (phone && email) {
+    query = query.or(`operator_phone.eq.${phone},operator_email.eq.${email}`);
+  } else if (phone) {
+    query = query.eq('operator_phone', phone);
+  } else {
+    query = query.eq('operator_email', email);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('REGISTERED_FETCH_ERROR:', error);
+    throw error;
+  }
+  
+  return data || [];
+};
+
+/**
+ * Automatically provisions legacy audit logs into the registered_assets vault for a new operator.
+ */
+export const provisionLegacyAssets = async (phone, email) => {
+  if (!phone && !email) return;
+
+  // 1. Fetch any existing history for this identity
+  const history = await getAssetInventory(phone, email);
+  if (history.length === 0) return;
+
+  // 2. Extract unique URLs
+  const uniqueUrls = [...new Set(history.map(h => h.url))];
+
+  // 3. Batch insert into registered_assets
+  const assetsToRegister = uniqueUrls.map(url => ({
+    operator_email: email,
+    operator_phone: phone,
+    domain_url: url
+  }));
+
+  const { error } = await supabase
+    .from('registered_assets')
+    .upsert(assetsToRegister, { onConflict: 'operator_email,domain_url', ignoreDuplicates: true });
+
+  if (error) {
+    console.error('LEGACY_PROVISION_ERROR:', error);
   }
 };
