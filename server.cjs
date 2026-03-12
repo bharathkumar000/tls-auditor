@@ -90,6 +90,7 @@ async function fetchCryptCheckData(host) {
       raw: data
     };
   } catch (err) {
+    console.error(`[EXT_INTEL_FAIL] ${host}:`, err.message);
     return null;
   }
 }
@@ -492,49 +493,73 @@ app.post("/api/audit", async (req, res) => {
       let penalty = 0;
       let bonus = 0;
       let hasTLS13 = false;
-      let hasHSTS = false; // Note: In a real environment, we would probe for headers. Simulated here for parity.
+      let hasHSTS = false;
+
+      console.log(`\n🕵️‍♂️ [SCORING_MISSION] Analyzing ${host}...`);
 
       const vulnerabilities = finalResults.scans.flatMap(s => s.matchedVulnerabilities);
       
       // 1. Protocol Specifics
       finalResults.scans.forEach(s => {
-        if (s.protocol === 'TLSv1.3') hasTLS13 = true;
-        if (s.protocol.match(/SSLv[23]/)) penalty += 100; // Instant F
-        if (s.protocol === 'TLSv1' || s.protocol === 'TLSv1.1') penalty += 20;
+        if (s.protocol === 'TLSv1.3') {
+          hasTLS13 = true;
+          console.log(`  [+10 pts] MODERN_PROTOCOL: TLS 1.3 encryption detected.`);
+          bonus += 10;
+        }
+        if (s.protocol.match(/SSLv[23]/)) {
+          console.log(`  [-100 pts] CRITICAL_PROTOCOL: SSL is decommissioned/insecure.`);
+          penalty += 100;
+        }
+        if (s.protocol === 'TLSv1' || s.protocol === 'TLSv1.1') {
+          console.log(`  [-20 pts] LEGACY_PROTOCOL: ${s.protocol} is past end-of-life.`);
+          penalty += 20;
+        }
       });
 
       // 2. Cipher & Integrity Rules
       vulnerabilities.forEach(v => {
-        const cat = v.category?.toUpperCase() || "";
-        const name = v.cipherName?.toUpperCase() || "";
+        const name = (v.cipherName || v.id || "").toUpperCase();
         
-        if (name.includes("NULL")) penalty += 100; // Instant F
-        if (name.includes("RC4") || name.includes("3DES")) penalty += 40;
-        if (name.includes("CBC") && !hasTLS13) penalty += 15;
-        
-        // Key Exchange & FS (Note: TLS 1.3 is always FS)
-        if (!name.includes("DHE") && !name.includes("ECDHE") && !hasTLS13) {
-          penalty += 10; // No Forward Secrecy detected in legacy ciphers
+        if (name.includes("NULL")) {
+          console.log(`  [-100 pts] NULL_CIPHER: Unencrypted tunnel detected.`);
+          penalty += 100;
         }
-        
-        // Certificate Signatures
-        if (v.id === "SHA1_CERT") penalty += 25;
+        if (name.includes("RC4") || name.includes("3DES")) {
+          console.log(`  [-40 pts] BROKEN_ALGORITHM: ${name} is computationally weak.`);
+          penalty += 40;
+        }
+        if (name.includes("CBC") && !hasTLS13) {
+          console.log(`  [-15 pts] CIPHER_MODE: CBC mode vulnerable in TLS < 1.3.`);
+          penalty += 15;
+        }
+        if (!name.includes("DHE") && !name.includes("ECDHE") && !hasTLS13) {
+          console.log(`  [-10 pts] NO_FS: Forward Secrecy gap in handshake.`);
+          penalty += 10;
+        }
+        if (v.id === "SHA1_CERT") {
+          console.log(`  [-25 pts] WEAK_SIGNATURE: SHA-1 certificate is deprecated.`);
+          penalty += 25;
+        }
       });
 
-      // 3. Bit-Depth & Certificate Integrity (Applied ONCE per host)
+      // 3. Bit-Depth (Applied ONCE per host)
       let rsaPenaltyApplied = false;
       finalResults.scans.forEach(s => {
         if (!rsaPenaltyApplied && s.cert && s.cert.bits && s.cert.bits > 0 && s.cert.bits < 2048) {
+          console.log(`  [-30 pts] BIT_DEPTH_FAIL: RSA_${s.cert.bits} is cryptographically weak.`);
           penalty += 30;
           rsaPenaltyApplied = true;
         }
       });
 
-      // 4. Header & TLS 1.3 Logic
-      if (hasTLS13) bonus += 10;
-      if (!hasHSTS) penalty += 5; // HSTS Missing
+      // 4. Header Logic
+      if (!hasHSTS) {
+        console.log(`  [-5 pts] HEADER_GAP: HSTS not detected on primary mission port.`);
+        penalty += 5;
+      }
 
       safetyScoreLocal = Math.max(0, Math.min(100, (100 - penalty + bonus)));
+      console.log(`✅ [INTERNAL_SCORE] Raw Security Result: ${safetyScoreLocal}%\n`);
     }
 
     // Wrap-up Unified Result
@@ -544,7 +569,10 @@ app.post("/api/audit", async (req, res) => {
     finalResults.externalSafety = { provider, score: externalScore };
     finalResults.cryptCheck = cryptCheck;
     
-    console.log(`[AUDIT_SUCCESS] ${host} - Scans: ${finalResults.scans.length}`);
+    console.log(`🏁 [MISSION_COMPLETE] ${host}`);
+    console.log(`   - Internal: ${safetyScoreLocal}% (40% Weight)`);
+    console.log(`   - External: ${externalScore}% (60% Weight)`);
+    console.log(`   - UNIFIED:  ${finalResults.safetyScore}%\n`);
     res.json(finalResults);
   } catch (err) {
     console.error(`[AUDIT_FATAL] Error auditing ${host}:`, err.message);
