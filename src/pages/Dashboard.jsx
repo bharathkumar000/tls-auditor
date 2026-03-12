@@ -39,10 +39,16 @@ function DashboardPage({ user, onLogout }) {
   const [urlError, setUrlError] = useState(null);
 
   useEffect(() => {
-    sessionStorage.setItem('tls_audit_url', url);
     sessionStorage.setItem('tls_audit_results', JSON.stringify(auditResults));
     sessionStorage.setItem('tls_show_results', showResults);
-  }, [url, auditResults, showResults]);
+  }, [auditResults, showResults]);
+
+  // Consume injected URL and clear it for future mission fresh starts
+  useEffect(() => {
+    if (sessionStorage.getItem('tls_audit_url')) {
+      sessionStorage.removeItem('tls_audit_url');
+    }
+  }, []);
 
   const addLog = (msg, type = 'info') => {
     setTerminalLogs(prev => [...prev.slice(-8), { 
