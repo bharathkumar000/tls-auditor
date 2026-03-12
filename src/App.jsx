@@ -60,9 +60,10 @@ function App() {
     setUser(userData);
     setActiveView('dashboard'); // Ensure we always land on home/dashboard
     
-    // Clear previous scan results to land on a fresh "Home" page
+    // Clear previous scan results and persisted URLs to land on a fresh "Home" page
     sessionStorage.removeItem('tls_show_results');
     sessionStorage.removeItem('tls_audit_results');
+    sessionStorage.removeItem('tls_audit_url');
     
     localStorage.setItem('tls_session_active', 'true');
   };
