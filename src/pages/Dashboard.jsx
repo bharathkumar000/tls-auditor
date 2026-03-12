@@ -456,6 +456,23 @@ function DashboardPage({ user, onLogout }) {
                   </div>
                 </div>
 
+                {/* ── THREAT_DEDUCTION_LEDGER ── */}
+                {vulnerabilities.length > 0 && (
+                  <div style={{ marginTop: '1.5rem', textAlign: 'left', background: 'rgba(255,0,0,0.05)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,75,75,0.1)' }}>
+                    <p style={{ fontSize: '0.6rem', color: 'var(--gold-primary)', marginBottom: '0.5rem', letterSpacing: '0.15em', fontWeight: '800' }}>[THREAT_DEDUCTION_LEDGER]</p>
+                    {vulnerabilities.map((v, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#ff4b4b', marginBottom: '0.3rem', fontFamily: 'var(--font-mono)' }}>
+                        <span style={{ opacity: 0.8 }}>• {v.split(':')[0] || 'VULNERABILITY'}</span>
+                        <span style={{ fontWeight: '900' }}>-20 PTS</span>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: 'var(--text-gray)', marginTop: '0.6rem', borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '0.4rem' }}>
+                      <span>OPERATIONAL_NET</span>
+                      <span style={{ fontWeight: 'bold' }}>{safetyScoreLocal}/100</span>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ marginTop: '1.75rem', background: `${statusObj.color}20`, padding: '0.4rem 1.25rem', borderRadius: '2rem', display: 'inline-block', fontWeight: '900', color: statusObj.color, border: `1px solid ${statusObj.color}40`, letterSpacing: '0.1em', fontSize: '0.85rem' }}>
                   STATUS: {statusObj.text}
                 </div>
@@ -522,8 +539,15 @@ function DashboardPage({ user, onLogout }) {
                   <div className="terminal-line success">
                     <span className="time">[{scan.protocol}]</span>
                     <span className="msg" style={{ color: 'var(--gold-primary)', fontWeight: 'bold' }}>
-                      :: {scan.cipher} <span style={{ opacity: 0.6, fontSize: '0.7rem' }}>[{scan.cipherBits || 'N/A'}-BIT]</span>
+                      :: {scan.cipher} <span style={{ opacity: 0.6, fontSize: '0.7rem' }}>
+                        [{(!scan.cipherBits || scan.cipherBits === 0) && (scan.cipher.includes('ECDSA') || scan.cipher.includes('ECC')) ? 'ECC-P256' : (scan.cipherBits || 'N/A')}-BIT]
+                      </span>
                     </span>
+                    {(scan.cert && scan.cert.bits > 0 && scan.cert.bits < 2048) && (
+                      <div style={{ fontSize: '0.65rem', color: '#ff4b4b', marginLeft: '1rem', fontStyle: 'italic', background: 'rgba(255,0,0,0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px', marginTop: '0.3rem', border: '1px solid rgba(255,0,0,0.2)' }}>
+                        THREAT_LEVEL: HIGH // RSA_{scan.cert.bits} detected. RATIONALE: Key complexity is below modern safety margins; vulnerable to Prime Factorization clusters. Upgrade to 3072-bit or ECC.
+                      </div>
+                    )}
                   </div>
                   {scan.issues.map((iss, j) => (
                     <div key={j} className="terminal-line error" style={{ marginLeft: '1rem' }}>
