@@ -43,6 +43,9 @@ function DashboardPage({ user, onLogout }) {
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [showCertViewer, setShowCertViewer] = useState(false);
+  const [activeCertTab, setActiveCertTab] = useState('general');
+  const [selectedCertField, setSelectedCertField] = useState('Version');
 
   useEffect(() => {
     sessionStorage.setItem('tls_audit_results', JSON.stringify(auditResults));
@@ -270,6 +273,76 @@ function DashboardPage({ user, onLogout }) {
 
       y += blockHeight + 6;
     });
+    y += 10;
+
+    // ── Remediation Intelligence (Merged) ──
+    const allIssues = [...new Set(auditResults.scans.flatMap(s => s.issues))];
+    const allRecs = [...new Set(auditResults.scans.flatMap(s => s.recommendations))];
+
+    if (allIssues.length > 0 || allRecs.length > 0) {
+      if (y + 40 > 275) {
+        doc.addPage();
+        doc.setFillColor(10, 10, 10);
+        doc.rect(0, 0, W, 297, 'F');
+        y = 30;
+      }
+
+      doc.setDrawColor(50, 50, 50);
+      doc.setLineWidth(0.5);
+      doc.line(15, y, W - 15, y);
+      doc.setFont('courier', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(212, 175, 55);
+      doc.text('│ REMEDIATION_INTELLIGENCE & TACTICAL_STEPS', 15, y + 8);
+      y += 16;
+
+      if (allIssues.length > 0) {
+        doc.setFont('courier', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(255, 75, 75);
+        doc.text('> CONSOLIDATED_VULNERABILITY_LOG', 15, y);
+        y += 6;
+
+        doc.setFont('courier', 'normal');
+        doc.setFontSize(6.5);
+        doc.setTextColor(200, 200, 200);
+        allIssues.forEach((iss, i) => {
+          const lines = doc.splitTextToSize(`${i + 1}. ${iss}`, W - 40);
+          if (y + (lines.length * 5) > 275) {
+            doc.addPage();
+            doc.setFillColor(10, 10, 10);
+            doc.rect(0, 0, W, 297, 'F');
+            y = 30;
+          }
+          doc.text(lines, 20, y);
+          y += lines.length * 5;
+        });
+        y += 8;
+      }
+
+      if (allRecs.length > 0) {
+        doc.setFont('courier', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(39, 201, 63);
+        doc.text('> RECOMMENDED_SECURITY_REFINEMENTS', 15, y);
+        y += 6;
+
+        doc.setFont('courier', 'normal');
+        doc.setFontSize(6.5);
+        doc.setTextColor(200, 200, 200);
+        allRecs.forEach((rec, i) => {
+          const lines = doc.splitTextToSize(`${i + 1}. ${rec}`, W - 40);
+          if (y + (lines.length * 5) > 275) {
+            doc.addPage();
+            doc.setFillColor(10, 10, 10);
+            doc.rect(0, 0, W, 297, 'F');
+            y = 30;
+          }
+          doc.text(lines, 20, y);
+          y += lines.length * 5;
+        });
+      }
+    }
 
     // ── Immutable Footer ──
     const totalPages = doc.getNumberOfPages();
@@ -285,7 +358,7 @@ function DashboardPage({ user, onLogout }) {
       doc.text(`OP_SEQUENCE: ${p} / ${totalPages}`, W - 15, 291, { align: 'right' });
     }
 
-    doc.save(`TLS_AUDIT_${auditResults.target.replace(/[^a-z0-9]/gi,'_')}_REPT.pdf`);
+    window.open(doc.output('bloburl'), '_blank');
   };
 
   const downloadCertificate = () => {
@@ -304,59 +377,6 @@ function DashboardPage({ user, onLogout }) {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-  };
-
-  const downloadRecommendationBrief = () => {
-    const doc = new jsPDF();
-    const allIssues = [...new Set(auditResults.scans.flatMap(s => s.issues))];
-    const allRecs = [...new Set(auditResults.scans.flatMap(s => s.recommendations))];
-    
-    doc.setProperties({ title: `RECOMMENDATION_BRIEF_${auditResults.target}` });
-    doc.setFillColor(15, 15, 15);
-    doc.rect(0, 0, 210, 297, 'F');
-    
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(18);
-    doc.setTextColor(212, 175, 55);
-    doc.text('TLS_AUDITOR // RECOMMENDATION_REPORT', 20, 30);
-    
-    doc.setFontSize(9);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`TARGET: ${auditResults.target}`, 20, 40);
-    doc.text(`TIMESTAMP: ${new Date().toLocaleString()}`, 20, 45);
-    doc.line(20, 50, 190, 50);
-
-    doc.setFontSize(11);
-    doc.setTextColor(212, 175, 55);
-    doc.text('[DETECTED_VULNERABILITIES]', 20, 65);
-    
-    doc.setFont('courier', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(255, 255, 255);
-    let y = 75;
-    allIssues.forEach((iss, i) => {
-      const lines = doc.splitTextToSize(`${i + 1}. ${iss}`, 170);
-      doc.text(lines, 20, y);
-      y += (lines.length * 5) + 2;
-    });
-
-    y += 10;
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(212, 175, 55);
-    doc.text('[TACTICAL_REMEDIATION_STEPS]', 20, y);
-    
-    y += 10;
-    doc.setFont('courier', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(255, 255, 255);
-    allRecs.forEach((rec, i) => {
-      const lines = doc.splitTextToSize(`${i + 1}. ${rec}`, 170);
-      doc.text(lines, 20, y);
-      y += (lines.length * 5) + 2;
-    });
-
-    doc.save(`RECOMMENDATION_REPORT_${auditResults.target.replace(/[^a-z0-9]/gi,'_')}.pdf`);
   };
 
   const downloadConfigSnippet = () => {
@@ -395,7 +415,7 @@ function DashboardPage({ user, onLogout }) {
     doc.setTextColor(255, 255, 255);
     doc.text(config, 25, 60);
 
-    doc.save(`HARDENED_CONFIG_${auditResults.target.replace(/[^a-z0-9]/gi,'_')}.pdf`);
+    window.open(doc.output('bloburl'), '_blank');
   };
 
   if (showResults && auditResults) {
@@ -456,23 +476,6 @@ function DashboardPage({ user, onLogout }) {
                   </div>
                 </div>
 
-                {/* ── THREAT_DEDUCTION_LEDGER ── */}
-                {vulnerabilities.length > 0 && (
-                  <div style={{ marginTop: '1.5rem', textAlign: 'left', background: 'rgba(255,0,0,0.05)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,75,75,0.1)' }}>
-                    <p style={{ fontSize: '0.6rem', color: 'var(--gold-primary)', marginBottom: '0.5rem', letterSpacing: '0.15em', fontWeight: '800' }}>[THREAT_DEDUCTION_LEDGER]</p>
-                    {vulnerabilities.map((v, i) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#ff4b4b', marginBottom: '0.3rem', fontFamily: 'var(--font-mono)' }}>
-                        <span style={{ opacity: 0.8 }}>• {v.split(':')[0] || 'VULNERABILITY'}</span>
-                        <span style={{ fontWeight: '900' }}>-20 PTS</span>
-                      </div>
-                    ))}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: 'var(--text-gray)', marginTop: '0.6rem', borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '0.4rem' }}>
-                      <span>OPERATIONAL_NET</span>
-                      <span style={{ fontWeight: 'bold' }}>{safetyScoreLocal}/100</span>
-                    </div>
-                  </div>
-                )}
-
                 <div style={{ marginTop: '1.75rem', background: `${statusObj.color}20`, padding: '0.4rem 1.25rem', borderRadius: '2rem', display: 'inline-block', fontWeight: '900', color: statusObj.color, border: `1px solid ${statusObj.color}40`, letterSpacing: '0.1em', fontSize: '0.85rem' }}>
                   STATUS: {statusObj.text}
                 </div>
@@ -517,7 +520,7 @@ function DashboardPage({ user, onLogout }) {
           <div className="terminal-header" style={{ display: isRegistered ? 'grid' : 'block', gridTemplateColumns: isRegistered ? '1fr 1fr' : 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <div className="terminal-dots"><span></span><span></span><span></span></div>
-              <div className="terminal-title">TLS_PROTOCOL_STACK_ANALYSIS // {auditResults.target}</div>
+              <div className="terminal-title">THREAT_DEDUCTION_LEDGER // {auditResults.target}</div>
             </div>
             {isRegistered && (
               <div style={{ paddingLeft: '1.5rem', borderLeft: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center' }}>
@@ -534,6 +537,39 @@ function DashboardPage({ user, onLogout }) {
           }}>
             {/* LEFT PANE: LOGS & SCAN DATA */}
             <div style={{ background: isRegistered ? 'rgba(0,0,0,0.2)' : 'transparent', padding: isRegistered ? '1.5rem' : '0' }}>
+              {/* THREAT_DEDUCTION_LEDGER CONTENT */}
+              <div style={{ marginBottom: '2.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1.5rem' }}>
+                <p style={{ fontSize: '0.85rem', color: 'var(--gold-primary)', marginBottom: '1.25rem', letterSpacing: '0.2em', fontWeight: '900' }}>[THREAT_DEDUCTION_LEDGER]</p>
+                {vulnerabilities.length > 0 ? (
+                  <>
+                    {vulnerabilities.map((v, i) => (
+                      <div key={i} className="terminal-line error" style={{ justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+                        <span className="msg" style={{ opacity: 0.9 }}>• {v.split(':')[0] || 'VULNERABILITY'}</span>
+                        <span className="msg" style={{ fontWeight: '900', color: '#ff4b4b' }}>-20 PTS</span>
+                      </div>
+                    ))}
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      fontSize: '0.75rem', 
+                      color: 'var(--text-gray)', 
+                      marginTop: '1rem', 
+                      fontFamily: 'var(--font-mono)',
+                      opacity: 0.8
+                    }}>
+                      <span>OPERATIONAL_NET</span>
+                      <span style={{ fontWeight: 'bold', color: 'var(--gold-primary)' }}>{safetyScoreLocal}/100</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="terminal-line success">
+                    <span className="msg">NO_VULNERABILITIES_DETECTED: System integrity verified.</span>
+                  </div>
+                )}
+              </div>
+
+              {/* TLS_PROTOCOL_STACK_ANALYSIS CONTENT */}
+              <p style={{ fontSize: '0.85rem', color: 'var(--hacker-green)', marginBottom: '1.25rem', letterSpacing: '0.2em', fontWeight: '900', opacity: 0.8 }}>[TLS_PROTOCOL_STACK_ANALYSIS]</p>
               {auditResults.scans.map((scan, i) => (
                 <div key={i} style={{ marginBottom: '1.5rem' }}>
                   <div className="terminal-line success">
@@ -543,11 +579,6 @@ function DashboardPage({ user, onLogout }) {
                         [{(!scan.cipherBits || scan.cipherBits === 0) && (scan.cipher.includes('ECDSA') || scan.cipher.includes('ECC')) ? 'ECC-P256' : (scan.cipherBits || 'N/A')}-BIT]
                       </span>
                     </span>
-                    {(scan.cert && scan.cert.bits > 0 && scan.cert.bits < 2048) && (
-                      <div style={{ fontSize: '0.65rem', color: '#ff4b4b', marginLeft: '1rem', fontStyle: 'italic', background: 'rgba(255,0,0,0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px', marginTop: '0.3rem', border: '1px solid rgba(255,0,0,0.2)' }}>
-                        THREAT_LEVEL: HIGH // RSA_{scan.cert.bits} detected. RATIONALE: Key complexity is below modern safety margins; vulnerable to Prime Factorization clusters. Upgrade to 3072-bit or ECC.
-                      </div>
-                    )}
                   </div>
                   {scan.issues.map((iss, j) => (
                     <div key={j} className="terminal-line error" style={{ marginLeft: '1rem' }}>
@@ -596,18 +627,15 @@ function DashboardPage({ user, onLogout }) {
             </button>
           )}
           
-          <button className="run-btn" onClick={downloadRecommendationBrief} style={{ padding: '1rem 2.5rem', background: 'rgba(212,175,55,0.15)', color: 'var(--gold-primary)' }}>
-            <FileText size={18} /> RECOMMENDATION_REPORT.PDF
-          </button>
           <button className="run-btn" onClick={downloadConfigSnippet} style={{ padding: '1rem 2.5rem', background: 'rgba(255,255,255,0.05)', color: '#fff' }}>
             <Code2 size={18} /> CONFIG_SNIPPET.PDF
           </button>
-          <button className="run-btn" onClick={generateReport} style={{ padding: '1rem 2.5rem' }}>
-            <Download size={20} /> DOWNLOAD_REPORT.PDF
+          <button className="run-btn" onClick={generateReport} style={{ padding: '1rem 2.5rem', background: 'var(--gold-primary)', color: '#000' }}>
+            <Download size={20} /> DOWNLOAD_SECURITY_REPORT.PDF
           </button>
           {auditResults.scans.some(s => s.cert && s.cert.raw) && (
-            <button className="run-btn" onClick={downloadCertificate} style={{ padding: '1rem 2.5rem', background: '#51afef', color: '#000', borderColor: '#51afef70' }}>
-              <ShieldCheck size={20} /> DOWNLOAD_CERTIFICATE.PEM
+            <button className="run-btn" onClick={() => setShowCertViewer(true)} style={{ padding: '1rem 2.5rem', background: '#51afef', color: '#000', borderColor: '#51afef70' }}>
+              <ShieldCheck size={20} /> VIEW_CERTIFICATE.INF
             </button>
           )}
         </div>
@@ -832,6 +860,231 @@ function DashboardPage({ user, onLogout }) {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(255, 75, 75, 0.3);
           }
+        `}</style>
+        {/* ── CERTIFICATE_VIEWER_MODAL ── */}
+        <AnimatePresence>
+          {showCertViewer && auditResults.scans.find(s => s.cert)?.cert && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="modal-overlay"
+              style={{ zIndex: 10000 }}
+            >
+              <motion.div 
+                initial={{ scale: 0.95, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 20 }}
+                className="cert-viewer-card"
+              >
+                <div className="cert-viewer-header">
+                  <span>Certificate Viewer: {auditResults.target}</span>
+                  <button onClick={() => setShowCertViewer(false)}><X size={18} /></button>
+                </div>
+                
+                <div className="cert-viewer-tabs">
+                  <button 
+                    className={activeCertTab === 'general' ? 'active' : ''} 
+                    onClick={() => setActiveCertTab('general')}
+                  >
+                    General
+                  </button>
+                  <button 
+                    className={activeCertTab === 'details' ? 'active' : ''} 
+                    onClick={() => setActiveCertTab('details')}
+                  >
+                    Details
+                  </button>
+                </div>
+
+                <div className="cert-viewer-body">
+                  {activeCertTab === 'general' ? (
+                    <div className="general-tab">
+                      <section>
+                        <h4>Issued To</h4>
+                        <div className="info-row"><span>Common Name (CN)</span> <strong>{auditResults.scans.find(s => s.cert)?.cert.subject || auditResults.target}</strong></div>
+                        <div className="info-row"><span>Organisation (O)</span> <span className="dim">&lt;Not part of certificate&gt;</span></div>
+                        <div className="info-row"><span>Organisational Unit (OU)</span> <span className="dim">&lt;Not part of certificate&gt;</span></div>
+                      </section>
+
+                      <section>
+                        <h4>Issued By</h4>
+                        <div className="info-row"><span>Common Name (CN)</span> <strong>{auditResults.scans.find(s => s.cert)?.cert.issuer || 'Unknown CA'}</strong></div>
+                        <div className="info-row"><span>Organisation (O)</span> <strong>{auditResults.scans.find(s => s.cert)?.cert.issuer || 'Unknown CA'}</strong></div>
+                        <div className="info-row"><span>Organisational Unit (OU)</span> <span className="dim">&lt;Not part of certificate&gt;</span></div>
+                      </section>
+
+                      <section>
+                        <h4>Validity Period</h4>
+                        <div className="info-row"><span>Issued On</span> <span>{new Date(auditResults.scans.find(s => s.cert)?.cert.validFrom).toLocaleString()}</span></div>
+                        <div className="info-row"><span>Expires On</span> <span>{new Date(auditResults.scans.find(s => s.cert)?.cert.validTo).toLocaleString()}</span></div>
+                      </section>
+
+                      <section>
+                        <h4>SHA-256 Fingerprints</h4>
+                        <div className="info-block" style={{ width: '100%', overflow: 'hidden' }}>
+                          <label style={{ fontSize: '11px', color: '#5f6368', marginBottom: '8px', display: 'block' }}>Public Key Telemetry</label>
+                          <code style={{ 
+                            background: '#f8f9fa', 
+                            padding: '12px', 
+                            border: '1px solid #dadce0', 
+                            wordBreak: 'break-all', 
+                            fontFamily: 'var(--font-mono)', 
+                            color: '#444', 
+                            fontSize: '11px',
+                            display: 'block',
+                            borderRadius: '4px',
+                            lineHeight: '1.4'
+                          }}>
+                            {auditResults.scans.find(s => s.cert)?.cert.pubkey || 'N/A'}
+                          </code>
+                        </div>
+                      </section>
+                    </div>
+                  ) : (
+                    <div className="details-tab">
+                      <div className="details-split">
+                        <div className="fields-list">
+                          <h4>Certificate Fields</h4>
+                          <ul>
+                            {['Version', 'Serial Number', 'Signature Algorithm', 'Issuer', 'Validity', 'Subject'].map(field => (
+                              <li 
+                                key={field}
+                                className={selectedCertField === field ? 'selected' : ''}
+                                onClick={() => setSelectedCertField(field)}
+                              >
+                                {field}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div className="field-value-pane">
+                          <h4>Field Value</h4>
+                          <div className="value-box">
+                            {(() => {
+                              const cert = auditResults.scans.find(s => s.cert)?.cert;
+                              if (selectedCertField === 'Version') return cert.version || 'v3';
+                              if (selectedCertField === 'Serial Number') return cert.serialNumber || 'N/A';
+                              if (selectedCertField === 'Signature Algorithm') return cert.sigAlgorithm || 'N/A';
+                              if (selectedCertField === 'Issuer') return cert.issuer || 'N/A';
+                              if (selectedCertField === 'Validity') return `Not Before: ${cert.validFrom}\nNot After: ${cert.validTo}`;
+                              if (selectedCertField === 'Subject') return cert.subject || 'N/A';
+                              return '';
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="cert-viewer-footer">
+                  <button className="export-btn" onClick={downloadCertificate}>Export...</button>
+                  <button className="close-btn" onClick={() => setShowCertViewer(false)}>Close</button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <style jsx>{`
+          .cert-viewer-card {
+            background: #fff;
+            color: #333;
+            width: 100%;
+            max-width: 580px;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            max-height: 85vh;
+          }
+          .cert-viewer-header {
+            background: #202124;
+            color: #fff;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+          }
+          .cert-viewer-header button {
+            background: none; border: none; color: #fff; cursor: pointer; opacity: 0.6;
+          }
+          .cert-viewer-tabs {
+            display: flex;
+            background: #f1f3f4;
+            padding: 8px 16px 0;
+            border-bottom: 1px solid #dadce0;
+          }
+          .cert-viewer-tabs button {
+            padding: 10px 20px;
+            border: 1px solid transparent;
+            border-bottom: none;
+            background: none;
+            font-size: 13px;
+            color: #5f6368;
+            cursor: pointer;
+            margin-bottom: -1px;
+            border-radius: 5px 5px 0 0;
+            transition: all 0.2s;
+          }
+          .cert-viewer-tabs button.active {
+            background: #fff;
+            border-color: #dadce0;
+            color: #1a73e8;
+            font-weight: 500;
+          }
+          .cert-viewer-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+            font-size: 13px;
+          }
+          .general-tab section { margin-bottom: 24px; }
+          .general-tab h4 { border-bottom: 1px solid #f1f3f4; padding-bottom: 8px; margin-bottom: 12px; color: #202124; font-size: 14px; font-weight: 600; }
+          .info-row { display: flex; margin-bottom: 8px; }
+          .info-row span:first-child { width: 160px; color: #5f6368; }
+          .info-row strong { color: #202124; font-weight: 500; }
+          .dim { color: #9aa0a6; font-style: italic; }
+          
+          .details-tab { height: 380px; }
+          .details-split { display: flex; height: 100%; gap: 20px; }
+          .fields-list { flex: 1; border: 1px solid #dadce0; display: flex; flex-direction: column; border-radius: 4px; }
+          .fields-list h4, .field-value-pane h4 { font-size: 11px; padding: 6px 12px; background: #f8f9fa; margin: 0; border-bottom: 1px solid #dadce0; color: #5f6368; text-transform: uppercase; letter-spacing: 0.05em; }
+          .fields-list ul { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
+          .fields-list li { padding: 8px 16px; cursor: pointer; border-bottom: 1px solid #f1f3f4; font-size: 12px; }
+          .fields-list li:hover { background: #f8f9fa; }
+          .fields-list li.selected { background: #e8f0fe; color: #1a73e8; font-weight: 500; }
+          .field-value-pane { flex: 1.6; border: 1px solid #dadce0; display: flex; flex-direction: column; border-radius: 4px; }
+          .value-box { flex: 1; padding: 12px; font-family: monospace; white-space: pre-wrap; background: #fff; color: #3c4043; overflow-y: auto; font-size: 11px; line-height: 1.5; }
+          
+          .cert-viewer-footer {
+            padding: 12px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #dadce0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+          }
+          .cert-viewer-footer button {
+            padding: 8px 24px;
+            border: 1px solid #dadce0;
+            background: #fff;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #3c4043;
+          }
+          .cert-viewer-footer button:hover { background: #f1f3f4; border-color: #9aa0a6; }
+          .cert-viewer-footer .export-btn { margin-right: auto; }
+          .cert-viewer-footer .close-btn { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+          .cert-viewer-footer .close-btn:hover { background: #1765cc; }
         `}</style>
       </main>
     );
