@@ -310,7 +310,8 @@ function DashboardPage({ user, onLogout }) {
     
     const statusObj = getStatusInfo(safetyScore);
     const strokeDasharray = `${(safetyScore * 314) / 100}, 314`;
-    const strokeDasharrayExternal = `${(externalScore * 238) / 100}, 238`;
+    const strokeDasharrayInternal = `${(safetyScoreLocal * 238) / 100}, 238`;
+    const strokeDasharrayExternal = `${(externalScore * 175) / 100}, 175`;
 
     return (
       <main className="main-content results-view">
