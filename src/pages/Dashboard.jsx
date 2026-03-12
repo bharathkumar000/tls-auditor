@@ -17,7 +17,7 @@ import {
   AlertTriangle,
   RefreshCw
 } from 'lucide-react';
-import { runAudit, saveAuditLog, isDomainRegistered } from '../services/auditService';
+import { runAudit, saveAuditLog, isDomainRegistered, createModificationRequest } from '../services/auditService';
 
 function DashboardPage({ user, onLogout }) {
   const [url, setUrl] = useState(() => {
@@ -38,6 +38,9 @@ function DashboardPage({ user, onLogout }) {
   const [showReportButton, setShowReportButton] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [urlError, setUrlError] = useState(null);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   useEffect(() => {
     sessionStorage.setItem('tls_audit_results', JSON.stringify(auditResults));
@@ -355,16 +358,21 @@ function DashboardPage({ user, onLogout }) {
                   <svg viewBox="0 0 110 110" className="circular-chart" style={{ width: '250px', height: '250px' }}>
                     <circle className="circle-bg" cx="55" cy="55" r="50"></circle>
                     <circle className="circle" cx="55" cy="55" r="50" style={{ strokeDasharray, stroke: statusObj.color, strokeWidth: '4' }}></circle>
-                    <circle className="circle-bg" cx="55" cy="55" r="38" style={{ strokeWidth: '2', opacity: '0.3' }}></circle>
-                    <circle className="circle" cx="55" cy="55" r="38" style={{ strokeDasharray: strokeDasharrayExternal, stroke: '#51afef', strokeWidth: '3.5', opacity: '0.8' }}></circle>
+                    <circle className="circle-bg" cx="55" cy="55" r="38" style={{ strokeWidth: '2', opacity: '0.15' }}></circle>
+                    <circle className="circle" cx="55" cy="55" r="38" style={{ strokeDasharray: strokeDasharrayInternal, stroke: 'var(--gold-primary)', strokeWidth: '3', opacity: '0.6' }}></circle>
+                    <circle className="circle-bg" cx="55" cy="55" r="28" style={{ strokeWidth: '1.5', opacity: '0.1' }}></circle>
+                    <circle className="circle" cx="55" cy="55" r="28" style={{ strokeDasharray: strokeDasharrayExternal, stroke: '#51afef', strokeWidth: '2.5', opacity: '0.8' }}></circle>
                   </svg>
                   
                   <div className="chart-legend">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: statusObj.color, boxShadow: `0 0 10px ${statusObj.color}40` }}></div> UNIFIED
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: statusObj.color, boxShadow: `0 0 10px ${statusObj.color}40` }}></div> UNIFIED
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#51afef', boxShadow: '0 0 10px rgba(81, 175, 239, 0.4)' }}></div> EXTERNAL
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--gold-primary)', boxShadow: '0 0 10px rgba(212, 175, 55, 0.4)' }}></div> INTERNAL
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#51afef', boxShadow: '0 0 10px rgba(81, 175, 239, 0.4)' }}></div> EXTERNAL
                     </div>
                   </div>
                 </div>
@@ -458,7 +466,11 @@ function DashboardPage({ user, onLogout }) {
         <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center', marginTop: '3rem', paddingBottom: '4rem' }}>
           {isRegistered && (
             <>
-              <button className="run-btn" style={{ padding: '1rem 2.5rem' }}>
+              <button 
+                className="run-btn" 
+                onClick={() => setShowRequestModal(true)}
+                style={{ padding: '1rem 2.5rem' }}
+              >
                 <Edit3 size={18} /> REQUEST_CHANGES.MOD
               </button>
               <button className="run-btn" onClick={() => setShowResults(false)} style={{ padding: '1rem 2.5rem' }}>
@@ -502,6 +514,125 @@ function DashboardPage({ user, onLogout }) {
                     </button>
                   </div>
                 </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── TACTICAL_CHANGE_REQUEST_POPUP ── */}
+        <AnimatePresence>
+          {showRequestModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="modal-overlay"
+              style={{ zIndex: 1000 }}
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 30 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 20 }}
+                className="request-modal-card"
+                style={{
+                  background: 'rgba(10,10,10,0.95)',
+                  border: '1px solid var(--gold-primary)40',
+                  borderRadius: '16px',
+                  width: '90%',
+                  maxWidth: '600px',
+                  padding: '2.5rem',
+                  boxShadow: '0 0 50px rgba(212, 175, 55, 0.1)',
+                  backdropFilter: 'blur(20px)',
+                  position: 'relative'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Edit3 className="gold-icon" size={24} style={{ color: 'var(--gold-primary)' }} />
+                    <div style={{ textAlign: 'left' }}>
+                      <h3 style={{ margin: 0, color: '#fff', fontSize: '1.2rem', letterSpacing: '2px' }}>MODIFICATION_REQUEST</h3>
+                      <p style={{ margin: 0, opacity: 0.5, fontSize: '0.7rem' }}>TARGET_PROVIDER: GODADDY / CLOUDFLARE_EDGE</p>
+                    </div>
+                  </div>
+                  <button className="close-popup" onClick={() => setShowRequestModal(false)} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', opacity: 0.6 }}>
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <form className="remedy-form" onSubmit={async (e) => {
+                  e.preventDefault();
+                  setIsSubmitting(true);
+                  try {
+                    await createModificationRequest({
+                      operatorName: user.fullName || 'LEAD_OPERATOR_ANISH',
+                      contactNode: user.phone || '7975274945',
+                      secureEmail: user.email || 'anishkumar07@gmail.com',
+                      targetDomain: auditResults?.target || 'N/A',
+                      requestedChanges: auditResults?.scans.flatMap(s => s.recommendations) || []
+                    });
+                    
+                    setIsSubmitting(false);
+                    setIsSubmitted(true);
+                    setTimeout(() => {
+                      setIsSubmitted(false);
+                      setShowRequestModal(false);
+                      addLog('TACTICAL_REQUEST_SENT: Provider notified of TLS reconfiguration. Data vaulted.', 'success');
+                    }, 2000);
+                  } catch (err) {
+                    setIsSubmitting(false);
+                    alert('CRITICAL_POST_FAILURE: Architecture vault rejected the packet.');
+                  }
+                }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                    <div className="input-group">
+                      <label style={{ display: 'block', margin: '0 0 8px 12px', opacity: 0.5, fontSize: '0.65rem' }}>OPERATOR_NAME</label>
+                      <input type="text" value={user.fullName || 'LEAD_OPERATOR_ANISH'} readOnly style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(136, 112, 35, 0.3)', borderRadius: '8px', padding: '12px', color: '#fff', fontSize: '0.9rem' }} />
+                    </div>
+                    <div className="input-group">
+                      <label style={{ display: 'block', margin: '0 0 8px 12px', opacity: 0.5, fontSize: '0.65rem' }}>CONTACT_NODE</label>
+                      <input type="text" value={user.phone || '7975274945'} readOnly style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(136, 112, 35, 0.3)', borderRadius: '8px', padding: '12px', color: '#fff', fontSize: '0.9rem' }} />
+                    </div>
+                    <div className="input-group">
+                      <label style={{ display: 'block', margin: '0 0 8px 12px', opacity: 0.5, fontSize: '0.65rem' }}>SECURE_EMAIL</label>
+                      <input type="text" value={user.email || 'anishkumar07@gmail.com'} readOnly style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(136, 112, 35, 0.3)', borderRadius: '8px', padding: '12px', color: '#fff', fontSize: '0.9rem' }} />
+                    </div>
+                    <div className="input-group">
+                      <label style={{ display: 'block', margin: '0 0 8px 12px', opacity: 0.5, fontSize: '0.65rem' }}>TARGET_DOMAIN</label>
+                      <input type="text" value={auditResults?.target || 'N/A'} readOnly style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(136, 112, 35, 0.3)', borderRadius: '8px', padding: '12px', color: 'var(--gold-primary)', fontWeight: 'bold', fontSize: '0.9rem' }} />
+                    </div>
+                  </div>
+
+                  <div className="changes-preview" style={{ background: 'rgba(0,0,0,0.3)', border: '1px dashed var(--gold-primary)30', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem' }}>
+                    <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.75rem', letterSpacing: '1px', opacity: 0.8 }}>RECOMMENDED_RECONFIGURATIONS:</h4>
+                    {auditResults?.scans.flatMap(s => s.recommendations).map((rec, k) => (
+                      <div key={k} style={{ display: 'flex', gap: '8px', alignItems: 'center', margin: '8px 0', fontSize: '0.8rem', opacity: 0.7 }}>
+                        <ChevronRight size={14} style={{ color: 'var(--gold-primary)' }} /> {rec}
+                      </div>
+                    ))}
+                    {auditResults?.scans.flatMap(s => s.recommendations).length === 0 && (
+                      <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.5 }}>No critical changes required. Node is secure.</p>
+                    )}
+                  </div>
+
+                  <div style={{ marginBottom: '2rem' }}>
+                    <label style={{ display: 'flex', gap: '12px', cursor: 'pointer', userSelect: 'none' }}>
+                      <input required type="checkbox" style={{ accentColor: 'var(--gold-primary)', transform: 'scale(1.2)' }} />
+                      <span style={{ fontSize: '0.75rem', opacity: 0.8, lineHeight: '1.4' }}>
+                        I request the domain provider to implement the above TLS configuration changes to mitigate mission-critical cryptographic vulnerabilities.
+                      </span>
+                    </label>
+                  </div>
+
+                  <button 
+                    disabled={isSubmitting || isSubmitted}
+                    className="run-btn" 
+                    style={{ width: '100%', padding: '1.2rem', position: 'relative' }}
+                  >
+                    {isSubmitting ? <Loader2 size={24} className="spin" /> : 
+                     isSubmitted ? <><CheckCircle size={20} style={{ marginRight: '8px' }} /> REQUEST_DEPLOED</> : 
+                     'SEND_MODIFICATION_PACKET'}
+                  </button>
+                </form>
               </motion.div>
             </motion.div>
           )}
