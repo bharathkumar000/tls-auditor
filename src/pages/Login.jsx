@@ -219,18 +219,20 @@ function LoginPage({ onLoginSuccess }) {
             )}
           </button>
           
+          {/* SYSTEM_IDENTITY_PROVISIONING */}
           {!isLogin && (
             <div className="form-group">
-              <label className="label">Verification Code (Optional/Skip)</label>
+              <label className="label">Operator Display Name</label>
               <div className="input-wrapper">
                 <Cpu className="input-icon" size={18} />
                 <input 
                   name="node_operator_name"
                   type="text" 
                   className="input" 
-                  placeholder="System Identity Name"
+                  placeholder="e.g. Lead Auditor // Anish"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
+                  required
                   autoComplete="off"
                 />
               </div>
