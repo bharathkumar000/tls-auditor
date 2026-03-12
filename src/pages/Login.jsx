@@ -18,8 +18,8 @@ import OTPVerify from '../components/OTPVerify';
 
 function LoginPage({ onLoginSuccess }) {
   const [isLogin, setIsLogin] = useState(true);
-  const [phone, setPhone] = useState('1');
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('7975274945');
+  const [email, setEmail] = useState('anishkumar07@gmail.com');
   const [password, setPassword] = useState('1');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);

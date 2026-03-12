@@ -164,3 +164,24 @@ export const provisionLegacyAssets = async (phone, email) => {
     console.error('LEGACY_PROVISION_ERROR:', error);
   }
 };
+
+/**
+ * Deploys a high-fidelity modification request to the tactical vault.
+ */
+export const createModificationRequest = async (requestData) => {
+  const { error } = await supabase
+    .from('mod_requests')
+    .insert([{
+      operator_name: requestData.operatorName,
+      contact_node: requestData.contactNode,
+      secure_email: requestData.secureEmail,
+      target_domain: requestData.targetDomain,
+      requested_changes: requestData.requestedChanges,
+      provider_info: 'GODADDY_CLOUDFLARE_HYBRID'
+    }]);
+
+  if (error) {
+    console.error('MOD_REQUEST_INSERT_FAIL:', error);
+    throw error;
+  }
+};
