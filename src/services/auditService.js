@@ -5,7 +5,7 @@ import { supabase } from '../supabaseClient';
  * Performs a TLS/SSL scan via the local Express server.
  */
 export const runAudit = async (url) => {
-  // 🛰️ TACTICAL PORT FUSION: Try local node if relative fetch fails
+  // 🛰️ TACTICAL PORT FUSION: Try local node if relative fetch fails or returns 404
   const apiEndpoint = '/api/audit';
   const localFallBack = 'http://localhost:9090/api/audit';
 
@@ -16,17 +16,27 @@ export const runAudit = async (url) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url })
     });
+
+    // If hosted (Vercel) returns 404, it means the scanner isn't deployed there.
+    // We must switch to the Local High-Fidelity node.
+    if (!response.ok && response.status === 404) {
+      throw new Error("PROCEED_TO_LOCAL_FALLBACK");
+    }
   } catch (e) {
-    // If relative fails (e.g. on Vercel), attempt local high-fidelity node
-    response = await fetch(localFallBack, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url })
-    });
+    try {
+      response = await fetch(localFallBack, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      });
+    } catch (localError) {
+      throw new Error(`MISSION_LINK_FAILURE: Could not connect to the Local Scan Node on Port 9090. Please ensure 'node server.cjs' is running.`);
+    }
   }
 
-  if (!response.ok) {
-    throw new Error(`System Error: ${response.status} - Use Port 9090`);
+  if (!response || !response.ok) {
+    const errorMsg = response ? `System Error: ${response.status}` : "Handshake Timeout";
+    throw new Error(`${errorMsg} - Ensure Local Scan Node is active on Port 9090`);
   }
 
   return await response.json();
