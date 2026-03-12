@@ -168,9 +168,9 @@ const protocolVulnerabilities = [
 
 // Certificate-level vulnerabilities
 const certVulnerabilities = [
-  { id: "VERY_SMALL_RSA", name: "Critically Weak RSA Key", severity: "HIGH", rationale: "RSA keys < 1024 bits are dangerously weak and easily cracked.", alt: "RSA 3072+ / ECC P-256" },
-  { id: "SMALL_RSA", name: "Small RSA Key", severity: "MEDIUM", rationale: "RSA keys < 2048 bits are below modern industry standards.", alt: "RSA 3072+ / ECC P-256" },
-  { id: "SHA1_CERT",  name: "SHA-1 Certificate", severity: "HIGH", rationale: "SHA-1 signature is collision-prone — certificates can be forged.", alt: "SHA-256 / SHA-384 signatures" },
+  { id: "VERY_SMALL_RSA", name: "Critically Weak RSA Key", severity: "HIGH", rationale: "RSA keys < 1024 bits (e.g. 512) are trivially breakable by modern cloud-compute clusters via Prime Factorization.", alt: "RSA 3072+ / ECC P-256" },
+  { id: "SMALL_RSA", name: "Small RSA Key", severity: "MEDIUM", rationale: "RSA 1024-bit is below modern cryptographic safety margins (NIST SP 800-57). Vulnerable to targeted offensive capabilities.", alt: "RSA 3072+ / ECC P-256" },
+  { id: "SHA1_CERT",  name: "SHA-1 Certificate", severity: "HIGH", rationale: "SHA-1 signature is collision-prone — certificates can be forged using industrial-scale collision attacks.", alt: "SHA-256 / SHA-384 signatures" },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -409,15 +409,19 @@ app.post("/api/audit", async (req, res) => {
         // ── Cipher suite checks ──
         const cipherMatches = matchCipherVulnerabilities(result.cipher);
         for (const match of cipherMatches) {
+          // EXCLUDE "SECURE" OR "NONE" MATCHES FROM LOGGING AS THREATS
+          if (match.severity === 'NONE' || match.category === 'SECURE') continue;
+
           const label = match.cipherName || match.category;
-          foundIssues.push(`[${match.severity}] VAULT_THREAT: ${match.category} detected [${match.cipherName}].`);
-          recommendations.push(getTacticalRecommendation('INSECURE_CIPHER', { cipher: match.cipherName, category: match.category }));
+          foundIssues.push(`[${match.severity}] VAULT_THREAT: ${match.category} detected [${match.cipherName || result.cipher}].`);
+          recommendations.push(getTacticalRecommendation('INSECURE_CIPHER', { cipher: match.cipherName || result.cipher, category: match.category }));
           matchedVulnerabilities.push({
             id: match.id,
             cipherName: match.cipherName || result.cipher,
             category: match.category,
             severity: match.severity,
-            secureFix: match.secureFix
+            secureFix: match.secureFix,
+            penalty: 20
           });
         }
 
@@ -425,15 +429,17 @@ app.post("/api/audit", async (req, res) => {
         if (result.cert.bits > 0 && result.cert.bits < 2048) {
           const type = result.cert.bits < 1024 ? "VERY_SMALL_RSA" : "SMALL_RSA";
           const severity = result.cert.bits < 1024 ? "RSA_PENALTY_20" : "RSA_PENALTY_10";
+          const v = certVulnerabilities.find(x => x.id === type);
           
-          foundIssues.push(`[${severity}] KEY_BIT_FAILURE: RSA_${result.cert.bits} detected.`);
+          foundIssues.push(`[${severity}] BIT_FAILURE: RSA_${result.cert.bits} detected. ${v.rationale}`);
           recommendations.push(getTacticalRecommendation(type, { bits: result.cert.bits }));
           
           matchedVulnerabilities.push({
             id: type,
             category: "CERTIFICATE",
             severity: severity,
-            bits: result.cert.bits
+            bits: result.cert.bits,
+            penalty: result.cert.bits < 1024 ? 20 : 10
           });
         }
 
