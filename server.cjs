@@ -247,6 +247,7 @@ async function testProtocol(host, protocol) {
       const socket = tls.connect({
         host: host,
         port: 443,
+        servername: host,
         minVersion: protocol,
         maxVersion: protocol,
         rejectUnauthorized: false,
@@ -264,6 +265,8 @@ async function testProtocol(host, protocol) {
           bits: cert.bits || 0,
           pubkey: cert.pubkey ? cert.pubkey.toString('hex').substring(0, 100) + "..." : null,
           sigAlgorithm: cert.sig_alg || cert.sigalg || 'Unknown',
+          serialNumber: cert.serialNumber || 'N/A',
+          version: cert.version ? `v${cert.version}` : 'v3',
           raw: cert.raw ? cert.raw.toString('base64') : null
         };
 
