@@ -23,9 +23,11 @@ export const login = async (email, password) => {
 
 /**
  * Register a new node with full metadata (Email, Name).
+ * Syncs the account creation both to the Auth Vault and the public primary database.
  */
 export const signUp = async (email, password, phone, fullName) => {
-  return await supabase.auth.signUp({
+  // 1. Initialize Auth Vault Entry
+  const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -35,6 +37,25 @@ export const signUp = async (email, password, phone, fullName) => {
       }
     }
   });
+
+  if (authError) return { data: null, error: authError };
+
+  // 2. Synchronize to Public Node Database (Primary Record)
+  if (authData.user) {
+    const { error: dbError } = await supabase
+      .from('profiles')
+      .upsert({
+        id: authData.user.id,
+        email: email,
+        phone: phone,
+        full_name: fullName,
+        updated_at: new Date().toISOString()
+      });
+      
+    if (dbError) console.warn('METADATA_SYNC_DELAY: Auth succeeded but profile sync failed.', dbError);
+  }
+
+  return { data: authData, error: null };
 };
 
 /**
