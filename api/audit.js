@@ -90,6 +90,19 @@ export default async function handler(req, res) {
     const cryptCheckPromise = fetchCryptCheckData(host);
     
     const scans = [];
+    
+    // 🚧 PROTOCOL_HIERARCHY_ENFORCEMENT: If URL starts with http://, it's an immediate 0-score vector.
+    if (url.startsWith('http://')) {
+      scans.push({
+        protocol: 'PLAINTEXT_HTTP',
+        cipher: 'NONE',
+        issues: ['[CRITICAL] PLAINTEXT_COMMUNICATION: Data broadcasted in plaintext over port 80.'],
+        recommendations: ['MANDATE https:// protocol instantly.', 'Deploy HSTS (Strict-Transport-Security) headers.'],
+        cert: { bits: 0 },
+        authorized: false
+      });
+    }
+
     for (const proto of testableProtocols) {
       const result = await testProtocol(host, proto);
       if (result) {
