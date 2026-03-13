@@ -53,7 +53,7 @@ Create a `.env` file in the root directory:
 CRYPT_CHECK_API=https://cryptcheck.fr/api/v1/host/
 VITE_SUPABASE_URL=YOUR_SUPABASE_URL
 VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_KEY
-PORT=9090
+PORT=3000
 ```
 
 ### 3️⃣ INSTALLATION
@@ -66,7 +66,7 @@ Launch the unified security console with a single command:
 ```bash
 npm run dev
 ```
-Navigate to **`http://localhost:9090`** to begin auditing.
+Navigate to **`http://localhost:3000`** to begin auditing.
 
 ---
 
