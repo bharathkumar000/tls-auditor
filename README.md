@@ -1,5 +1,5 @@
 # 🛡️ TLS AUDITOR
-### **High-Fidelity Infrastructure Security Analysis Engine**
+### **High-Fidelity Infrastructure Security Analysis Enginee**
 
 [![HACKATHON](https://img.shields.io/badge/GSSS_HACK_THE_HACKERS-4th_PLACE-gold?style=for-the-badge&logo=target)](https://github.com/bharathkumar000/tls-auditor)
 [![SECURITY](https://img.shields.io/badge/MISSION-CRITICAL-red?style=for-the-badge&logo=shield)](https://github.com/bharathkumar000/tls-auditor)
